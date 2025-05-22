@@ -119,7 +119,7 @@ def api_report(report_id):
 def scrape():
     try:
         # 从东方财富网爬取最新研报
-        from main import report_url
+        report_url = "https://data.eastmoney.com/report/hyyb.html"
         print(f"开始爬取研报数据: {report_url}")
         reports_data = scrape_research_reports(report_url)
         print(f"成功爬取到 {len(reports_data)} 条研报数据")
@@ -130,15 +130,14 @@ def scrape():
                 "message": "未能爬取到有效的研报数据，请检查爬取逻辑或网站结构是否变更"
             }), 500
         
-        # 限制处理的报告数量
-        max_reports = min(10, len(reports_data))
-        print(f"将处理前 {max_reports} 条研报")
+        # 处理所有爬取到的研报
+        print(f"将处理全部 {len(reports_data)} 条研报")
         
         # 分析研报
         analyzed_reports = []
-        for i, report in enumerate(reports_data[:max_reports]):
+        for i, report in enumerate(reports_data):
             try:
-                print(f"\n处理第 {i+1}/{max_reports} 条研报: {report.get('title', 'N/A')}")
+                print(f"\n处理第 {i+1}/{len(reports_data)} 条研报: {report.get('title', 'N/A')}")
                 
                 # 获取研报详情内容
                 content = get_report_detail(report.get("link", ""))
@@ -158,7 +157,6 @@ def scrape():
                     "link": report.get("link", "N/A"),
                     "abstract": report.get("abstract", "N/A"),
                     "content_preview": content[:200] + "..." if content else "未获取到内容",
-                    "full_content": content,
                     "industry": industry,
                     "rating": report.get("rating", "N/A"),
                     "org": report.get("org", "N/A"),
@@ -167,7 +165,7 @@ def scrape():
                     "analysis_method": "Claude增强"
                 })
                 
-                print(f"完成第 {i+1}/{max_reports} 条研报的分析")
+                print(f"完成第 {i+1}/{len(reports_data)} 条研报的分析")
             except Exception as e:
                 print(f"处理研报 {report.get('title', 'N/A')} 时出错: {str(e)}")
                 # 继续处理下一条研报

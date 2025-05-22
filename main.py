@@ -602,39 +602,34 @@ if __name__ == "__main__":
     # 对每份报告进行五步分析
     analyzed_reports = []
     
-    # 限制处理的报告数量，避免请求过多
-    max_reports = min(10, len(reports_data))
-    print(f"将处理前 {max_reports} 条研报数据")
+    # 处理所有爬取到的研报数据
+    print(f"将处理全部 {len(reports_data)} 条研报数据")
     
-    for i, report in enumerate(reports_data[:max_reports]):
-        print(f"\n处理第 {i+1}/{max_reports} 条研报: {report.get('title', 'N/A')}")
+    for i, report in enumerate(reports_data):
+        print(f"\n处理第 {i+1}/{len(reports_data)} 条研报: {report.get('title', 'N/A')}")
         
-        # 获取研报详情内容
-        content = get_report_detail(report.get("link", ""))
-        
-        # 获取行业信息
-        industry = report.get("industry", "N/A")
-        
-        # 进行五步分析，使用Claude
-        analysis = analyze_with_five_steps(
-            report.get("abstract", ""),
-            content,
-            industry=industry
-        )
-        
-        analyzed_reports.append({
-            "title": report.get("title", "N/A"),
-            "link": report.get("link", "N/A"),
-            "abstract": report.get("abstract", "N/A"),
-            "content_preview": content[:200] + "..." if content else "未获取到内容",
-            "full_content": content,
-            "industry": industry,
-            "rating": report.get("rating", "N/A"),
-            "org": report.get("org", "N/A"),
-            "date": report.get("date", "N/A"),
-            "analysis": analysis,
-            "analysis_method": "Claude增强"
-        })
+        # 对于每份报告，尝试获取详细内容并分析
+        try:
+            # 获取研报详情
+            content = get_report_detail(report['link'])
+            
+            # 使用五步法分析
+            analysis = analyze_with_five_steps(
+                report['abstract'], 
+                content,
+                industry=report['industry']
+            )
+            
+            # 将分析结果添加到报告数据中
+            report['analysis'] = analysis
+            report['full_content'] = content
+            
+            analyzed_reports.append(report)
+            print(f"完成第 {i+1} 份研报的分析")
+            
+        except Exception as e:
+            print(f"处理研报时出错: {e}")
+            continue
 
     # 保存结果
     save_results(analyzed_reports)
