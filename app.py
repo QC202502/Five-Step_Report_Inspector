@@ -5,9 +5,10 @@ import os
 import sys
 import socket
 from main import scrape_research_reports, analyze_with_five_steps, get_report_detail, get_evaluation_text
+import database as db  # 导入数据库模块
 
 # 版本常量
-VERSION = "0.1.2"
+VERSION = "0.2.0"
 
 app = Flask(__name__)
 
@@ -32,12 +33,23 @@ def find_available_port(start_port=5001, max_attempts=10):
     # 如果找不到可用端口，返回一个较高的端口，希望它是可用的
     return 8080
 
-# 加载已保存的研报数据
+# 加载研报数据
 def load_reports():
-    if os.path.exists('research_reports.json'):
-        with open('research_reports.json', 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return []
+    """
+    从数据库加载研报数据
+    如果数据库中没有数据，尝试从JSON文件导入
+    """
+    # 获取数据库中的报告数量
+    report_count = db.count_reports()
+    
+    # 如果数据库中没有数据，尝试从JSON导入
+    if report_count == 0 and os.path.exists('research_reports.json'):
+        print("数据库中没有数据，尝试从JSON文件导入...")
+        imported_count = db.import_from_json()
+        print(f"成功导入 {imported_count} 条研报数据到数据库")
+    
+    # 从数据库获取研报列表
+    return db.get_reports_from_db()
 
 # 首页路由 - 展示研报列表
 @app.route('/')
@@ -166,15 +178,18 @@ def scrape():
                 "message": "未能成功分析任何研报，请检查分析逻辑"
             }), 500
         
-        # 保存结果
+        # 将分析结果保存到数据库
+        db_saved_count = db.save_reports_to_db(analyzed_reports)
+        
+        # 同时保存到JSON文件（为了兼容性）
         with open('research_reports.json', 'w', encoding='utf-8') as f:
             json.dump(analyzed_reports, f, ensure_ascii=False, indent=4)
         
-        print(f"成功分析了 {len(analyzed_reports)} 条研报并保存结果")
+        print(f"成功分析了 {len(analyzed_reports)} 条研报，已保存 {db_saved_count} 条到数据库")
         
         return jsonify({
             "success": True,
-            "message": f"成功爬取并分析了 {len(analyzed_reports)} 条研报数据 (使用Claude增强语义分析)",
+            "message": f"成功爬取并分析了 {len(analyzed_reports)} 条研报数据，其中 {db_saved_count} 条保存到数据库",
             "count": len(analyzed_reports)
         })
     except Exception as e:
@@ -233,7 +248,42 @@ def stats():
         total_reports=len(reports)
     )
 
+# 搜索研报
+@app.route('/search')
+def search():
+    keyword = request.args.get('q', '')
+    if not keyword:
+        return redirect('/')
+        
+    reports = db.search_reports(keyword)
+    return render_template('search_results.html', 
+                           reports=reports, 
+                           keyword=keyword, 
+                           count=len(reports))
+
+# 按行业筛选研报
+@app.route('/industry/<industry>')
+def industry_reports(industry):
+    reports = db.get_reports_by_industry(industry)
+    return render_template('industry.html', 
+                           reports=reports, 
+                           industry=industry, 
+                           count=len(reports))
+
+# 初始化应用
+def init_app():
+    # 初始化数据库
+    db.init_db()
+    
+    # 如果存在JSON文件且数据库为空，导入数据
+    if os.path.exists('research_reports.json') and db.count_reports() == 0:
+        print("初始化数据库并导入现有数据...")
+        db.import_from_json()
+
 if __name__ == '__main__':
+    # 初始化应用
+    init_app()
+    
     # 查找可用端口
     port = find_available_port()
     print(f"启动Flask应用，使用端口: {port}")

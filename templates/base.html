@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}五步法研报检查器{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">五步法研报检查器</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/stats' %}active{% endif %}" href="/stats">统计分析</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="scrapeBtn">实时爬取</a>
+                    </li>
+                </ul>
+                <form class="d-flex ms-auto" action="/search" method="get">
+                    <input class="form-control me-2" type="search" name="q" placeholder="搜索研报..." aria-label="搜索">
+                    <button class="btn btn-outline-light" type="submit">搜索</button>
+                </form>
+            </div>
+        </div>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+    <!-- 爬取进度模态框 -->
+    <div class="modal fade" id="scrapeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">数据爬取</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>正在爬取最新研报数据并使用Claude进行智能分析，请稍候...</p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-light py-3 mt-5">
+        <div class="container text-center">
+            <p>黄燕铭五步分析法研报检查器 &copy; 2025 | 版本: 0.1.2</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 全局事件处理脚本
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置爬取按钮事件监听
+            var scrapeBtn = document.getElementById('scrapeBtn');
+            if (scrapeBtn) {
+                scrapeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    if (confirm('确定要爬取最新研报数据吗？这可能需要几分钟时间。')) {
+                        // 显示爬取进度模态框
+                        var scrapeModal = new bootstrap.Modal(document.getElementById('scrapeModal'));
+                        scrapeModal.show();
+                        
+                        // 发送爬取请求
+                        fetch('/scrape')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    alert(data.message);
+                                    // 刷新页面显示新数据
+                                    window.location.reload();
+                                } else {
+                                    alert('爬取失败: ' + data.message);
+                                    scrapeModal.hide();
+                                }
+                            })
+                            .catch(error => {
+                                alert('爬取失败: ' + error);
+                                scrapeModal.hide();
+                            });
+                    }
+                });
+            }
+        });
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html> 
