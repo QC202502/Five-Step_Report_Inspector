@@ -8,7 +8,7 @@ from main import scrape_research_reports, analyze_with_five_steps, get_report_de
 import database as db  # 导入数据库模块
 
 # 版本常量
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 app = Flask(__name__)
 
