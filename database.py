@@ -4,6 +4,7 @@ import json
 import os
 import time
 from datetime import datetime
+import re
 
 # 数据库文件名
 DB_FILE = 'research_reports.db'
@@ -30,7 +31,7 @@ def init_db():
             link TEXT UNIQUE NOT NULL,
             abstract TEXT,
             content_preview TEXT,
-            full_content TEXT,
+            full_content TEXT, -- SQLite的TEXT类型没有长度限制，可以存储大量文本
             industry TEXT,
             rating TEXT,
             org TEXT,
@@ -49,13 +50,37 @@ def init_db():
             report_id INTEGER NOT NULL,
             step_name TEXT NOT NULL,
             found INTEGER NOT NULL,
-            keywords TEXT,
-            evidence TEXT,
-            description TEXT,
+            keywords TEXT, -- 可以存储JSON格式的关键词列表
+            evidence TEXT, -- 可以存储JSON格式的证据列表
+            description TEXT, -- 详细描述，支持长文本
+            framework_summary TEXT, -- 五步框架梳理中的核心内容提炼
+            improvement_suggestions TEXT, -- 可操作补强思路
+            step_score INTEGER, -- 该步骤的分数
             FOREIGN KEY (report_id) REFERENCES reports (id),
             UNIQUE (report_id, step_name)
         )
         ''')
+        
+        # 创建报告完整分析表，用于存储完整的Claude分析文本
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS report_full_analysis (
+            report_id INTEGER PRIMARY KEY,
+            full_analysis_text TEXT, -- 完整的Claude分析文本
+            one_line_summary TEXT, -- 一句话总结
+            FOREIGN KEY (report_id) REFERENCES reports (id)
+        )
+        ''')
+        
+        # 尝试添加新列（如果表已存在）
+        try:
+            # 为已存在的analysis_results表添加新字段
+            conn.execute('ALTER TABLE analysis_results ADD COLUMN framework_summary TEXT;')
+            conn.execute('ALTER TABLE analysis_results ADD COLUMN improvement_suggestions TEXT;')
+            conn.execute('ALTER TABLE analysis_results ADD COLUMN step_score INTEGER;')
+            print("成功为analysis_results表添加新字段")
+        except Exception as e:
+            # 如果列已存在，sqlite会抛出错误
+            print(f"添加新列时出现信息（可能列已存在）: {e}")
         
         conn.commit()
         print("数据库初始化成功")
@@ -108,8 +133,56 @@ def save_report_to_db(report_data):
         # 获取插入的研报ID
         report_id = cursor.lastrowid
         
+        # 保存完整分析文本和一句话总结
+        full_analysis = report_data.get('full_analysis', '')
+        one_line_summary = report_data.get('analysis', {}).get('summary', {}).get('one_line_summary', '')
+        
+        if full_analysis or one_line_summary:
+            cursor.execute('''
+            INSERT OR REPLACE INTO report_full_analysis (
+                report_id, full_analysis_text, one_line_summary
+            ) VALUES (?, ?, ?)
+            ''', (
+                report_id,
+                full_analysis,
+                one_line_summary
+            ))
+        
         # 插入分析结果
         analysis = report_data.get('analysis', {})
+        
+        # 从Claude结果中提取五步框架梳理和可操作补强思路
+        framework_summaries = {}  # 用于存储各步骤的框架摘要
+        improvement_suggestions = ""  # 用于存储改进建议
+        
+        # 尝试从full_analysis中提取框架摘要
+        if full_analysis:
+            try:
+                # 提取框架梳理部分
+                framework_section_match = re.search(r'## 五步框架梳理(.*?)##', full_analysis, re.DOTALL)
+                if framework_section_match:
+                    framework_section = framework_section_match.group(1)
+                    steps_mapping = {
+                        'Information': '信息',
+                        'Logic': '逻辑',
+                        'Beyond-Consensus': '超预期',
+                        'Catalyst': '催化剂',
+                        'Conclusion': '结论'
+                    }
+                    
+                    for eng_name, cn_name in steps_mapping.items():
+                        pattern = r'\| ' + re.escape(eng_name) + r' \|(.*?)\|'
+                        match = re.search(pattern, framework_section, re.DOTALL)
+                        if match:
+                            framework_summaries[cn_name] = match.group(1).strip()
+                
+                # 提取可操作补强思路部分
+                suggestions_match = re.search(r'## 可操作补强思路(.*?)##', full_analysis, re.DOTALL)
+                if suggestions_match:
+                    improvement_suggestions = suggestions_match.group(1).strip()
+            except Exception as e:
+                print(f"从full_analysis提取框架摘要和改进建议时出错: {e}")
+        
         for step in ['信息', '逻辑', '超预期', '催化剂', '结论']:
             if step in analysis:
                 step_data = analysis[step]
@@ -118,15 +191,19 @@ def save_report_to_db(report_data):
                 
                 conn.execute('''
                 INSERT OR REPLACE INTO analysis_results (
-                    report_id, step_name, found, keywords, evidence, description
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    report_id, step_name, found, keywords, evidence, description,
+                    framework_summary, improvement_suggestions, step_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     report_id,
                     step,
                     1 if step_data.get('found', False) else 0,
                     keywords_json,
                     evidence_json,
-                    step_data.get('description', '')
+                    step_data.get('description', ''),
+                    framework_summaries.get(step, ''),  # 添加框架摘要
+                    improvement_suggestions if step == '结论' else '',  # 只在结论步骤保存改进建议
+                    step_data.get('step_score', 0)  # 添加步骤评分
                 ))
         
         conn.commit()
@@ -180,12 +257,13 @@ def get_reports_from_db(limit=100, offset=0):
         
         for row in rows:
             report = dict(row)
+            report_id = row['id']
             
             # 获取研报的分析结果
             analysis_rows = cursor.execute('''
             SELECT * FROM analysis_results
             WHERE report_id = ?
-            ''', (row['id'],)).fetchall()
+            ''', (report_id,)).fetchall()
             
             analysis = {}
             for ar in analysis_rows:
@@ -194,15 +272,37 @@ def get_reports_from_db(limit=100, offset=0):
                     'found': bool(ar['found']),
                     'keywords': json.loads(ar['keywords']),
                     'evidence': json.loads(ar['evidence']),
-                    'description': ar['description']
+                    'description': ar['description'],
+                    'step_score': ar['step_score'] if 'step_score' in ar else 0  # 获取步骤评分
                 }
+                
+                # 获取框架摘要和改进建议（如果存在）
+                if 'framework_summary' in ar and ar['framework_summary']:
+                    analysis[step_name]['framework_summary'] = ar['framework_summary']
+                
+                if 'improvement_suggestions' in ar and ar['improvement_suggestions'] and step_name == '结论':
+                    analysis['improvement_suggestions'] = ar['improvement_suggestions']
+            
+            # 获取完整分析文本和一句话总结
+            full_analysis_row = cursor.execute('''
+            SELECT * FROM report_full_analysis
+            WHERE report_id = ?
+            ''', (report_id,)).fetchone()
             
             # 添加摘要数据
             analysis['summary'] = {
                 'completeness_score': report['completeness_score'],
-                'steps_found': sum(1 for step in analysis.values() if step.get('found', False)),
+                'steps_found': sum(1 for step in analysis.values() if isinstance(step, dict) and step.get('found', False)),
                 'evaluation': get_evaluation_text(report['completeness_score'])
             }
+            
+            # 添加一句话总结和完整分析文本（如果存在）
+            if full_analysis_row:
+                if 'one_line_summary' in full_analysis_row and full_analysis_row['one_line_summary']:
+                    analysis['summary']['one_line_summary'] = full_analysis_row['one_line_summary']
+                
+                if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
+                    report['full_analysis'] = full_analysis_row['full_analysis_text']
             
             # 移除数据库ID，并添加分析结果
             del report['id']
@@ -236,6 +336,7 @@ def get_report_by_id(report_id):
             return None
             
         report = dict(row)
+        db_id = report['id']
         
         # 获取研报的分析结果
         analysis_rows = cursor.execute('SELECT * FROM analysis_results WHERE report_id = ?', (report_id,)).fetchall()
@@ -247,18 +348,39 @@ def get_report_by_id(report_id):
                 'found': bool(ar['found']),
                 'keywords': json.loads(ar['keywords']),
                 'evidence': json.loads(ar['evidence']),
-                'description': ar['description']
+                'description': ar['description'],
+                'step_score': ar['step_score'] if 'step_score' in ar else 0  # 获取步骤评分
             }
+            
+            # 获取框架摘要和改进建议（如果存在）
+            if 'framework_summary' in ar and ar['framework_summary']:
+                analysis[step_name]['framework_summary'] = ar['framework_summary']
+            
+            if 'improvement_suggestions' in ar and ar['improvement_suggestions'] and step_name == '结论':
+                analysis['improvement_suggestions'] = ar['improvement_suggestions']
+        
+        # 获取完整分析文本和一句话总结
+        full_analysis_row = cursor.execute('''
+        SELECT * FROM report_full_analysis
+        WHERE report_id = ?
+        ''', (report_id,)).fetchone()
         
         # 添加摘要数据
         analysis['summary'] = {
             'completeness_score': report['completeness_score'],
-            'steps_found': sum(1 for step in analysis.values() if step.get('found', False)),
+            'steps_found': sum(1 for step in analysis.values() if isinstance(step, dict) and step.get('found', False)),
             'evaluation': get_evaluation_text(report['completeness_score'])
         }
         
+        # 添加一句话总结和完整分析文本（如果存在）
+        if full_analysis_row:
+            if 'one_line_summary' in full_analysis_row and full_analysis_row['one_line_summary']:
+                analysis['summary']['one_line_summary'] = full_analysis_row['one_line_summary']
+            
+            if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
+                report['full_analysis'] = full_analysis_row['full_analysis_text']
+        
         # 移除数据库ID，并添加分析结果
-        db_id = report['id']
         del report['id']
         report['analysis'] = analysis
         report['db_id'] = db_id  # 保留数据库ID作为单独字段
@@ -296,12 +418,13 @@ def get_reports_by_industry(industry, limit=100):
         reports = []
         for row in rows:
             report = dict(row)
+            report_id = row['id']
             
             # 获取研报的分析结果
             analysis_rows = cursor.execute('''
             SELECT * FROM analysis_results
             WHERE report_id = ?
-            ''', (row['id'],)).fetchall()
+            ''', (report_id,)).fetchall()
             
             analysis = {}
             for ar in analysis_rows:
@@ -310,15 +433,37 @@ def get_reports_by_industry(industry, limit=100):
                     'found': bool(ar['found']),
                     'keywords': json.loads(ar['keywords']),
                     'evidence': json.loads(ar['evidence']),
-                    'description': ar['description']
+                    'description': ar['description'],
+                    'step_score': ar['step_score'] if 'step_score' in ar else 0  # 获取步骤评分
                 }
+                
+                # 获取框架摘要和改进建议（如果存在）
+                if 'framework_summary' in ar and ar['framework_summary']:
+                    analysis[step_name]['framework_summary'] = ar['framework_summary']
+                
+                if 'improvement_suggestions' in ar and ar['improvement_suggestions'] and step_name == '结论':
+                    analysis['improvement_suggestions'] = ar['improvement_suggestions']
+            
+            # 获取完整分析文本和一句话总结
+            full_analysis_row = cursor.execute('''
+            SELECT * FROM report_full_analysis
+            WHERE report_id = ?
+            ''', (report_id,)).fetchone()
             
             # 添加摘要数据
             analysis['summary'] = {
                 'completeness_score': report['completeness_score'],
-                'steps_found': sum(1 for step in analysis.values() if step.get('found', False)),
+                'steps_found': sum(1 for step in analysis.values() if isinstance(step, dict) and step.get('found', False)),
                 'evaluation': get_evaluation_text(report['completeness_score'])
             }
+            
+            # 添加一句话总结和完整分析文本（如果存在）
+            if full_analysis_row:
+                if 'one_line_summary' in full_analysis_row and full_analysis_row['one_line_summary']:
+                    analysis['summary']['one_line_summary'] = full_analysis_row['one_line_summary']
+                
+                if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
+                    report['full_analysis'] = full_analysis_row['full_analysis_text']
             
             # 移除数据库ID，并添加分析结果
             del report['id']
@@ -361,12 +506,13 @@ def search_reports(keyword, limit=100):
         reports = []
         for row in rows:
             report = dict(row)
+            report_id = row['id']
             
             # 获取研报的分析结果
             analysis_rows = cursor.execute('''
             SELECT * FROM analysis_results
             WHERE report_id = ?
-            ''', (row['id'],)).fetchall()
+            ''', (report_id,)).fetchall()
             
             analysis = {}
             for ar in analysis_rows:
@@ -375,15 +521,37 @@ def search_reports(keyword, limit=100):
                     'found': bool(ar['found']),
                     'keywords': json.loads(ar['keywords']),
                     'evidence': json.loads(ar['evidence']),
-                    'description': ar['description']
+                    'description': ar['description'],
+                    'step_score': ar['step_score'] if 'step_score' in ar else 0  # 获取步骤评分
                 }
+                
+                # 获取框架摘要和改进建议（如果存在）
+                if 'framework_summary' in ar and ar['framework_summary']:
+                    analysis[step_name]['framework_summary'] = ar['framework_summary']
+                
+                if 'improvement_suggestions' in ar and ar['improvement_suggestions'] and step_name == '结论':
+                    analysis['improvement_suggestions'] = ar['improvement_suggestions']
+            
+            # 获取完整分析文本和一句话总结
+            full_analysis_row = cursor.execute('''
+            SELECT * FROM report_full_analysis
+            WHERE report_id = ?
+            ''', (report_id,)).fetchone()
             
             # 添加摘要数据
             analysis['summary'] = {
                 'completeness_score': report['completeness_score'],
-                'steps_found': sum(1 for step in analysis.values() if step.get('found', False)),
+                'steps_found': sum(1 for step in analysis.values() if isinstance(step, dict) and step.get('found', False)),
                 'evaluation': get_evaluation_text(report['completeness_score'])
             }
+            
+            # 添加一句话总结和完整分析文本（如果存在）
+            if full_analysis_row:
+                if 'one_line_summary' in full_analysis_row and full_analysis_row['one_line_summary']:
+                    analysis['summary']['one_line_summary'] = full_analysis_row['one_line_summary']
+                
+                if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
+                    report['full_analysis'] = full_analysis_row['full_analysis_text']
             
             # 移除数据库ID，并添加分析结果
             del report['id']
@@ -459,11 +627,79 @@ def export_to_json(json_file='exported_reports.json'):
     bool: 是否成功导出
     """
     try:
-        reports = get_reports_from_db(limit=1000)  # 获取最多1000条数据
+        # 修改连接以使用标准字典
+        conn = sqlite3.connect(DB_FILE)
+        # 使用自定义的 row factory 函数，将 Row 对象转换为 dict
+        conn.row_factory = lambda cursor, row: {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
+        
+        cursor = conn.cursor()
+        
+        # 获取研报基本数据
+        reports = []
+        rows = cursor.execute('''
+        SELECT * FROM reports
+        ORDER BY id DESC
+        LIMIT 1000
+        ''').fetchall()
+        
+        for row in rows:
+            report = row  # 已经是字典了
+            report_id = row['id']
+            
+            # 获取研报的分析结果
+            analysis_rows = cursor.execute('''
+            SELECT * FROM analysis_results
+            WHERE report_id = ?
+            ''', (report_id,)).fetchall()
+            
+            analysis = {}
+            for ar in analysis_rows:
+                step_name = ar['step_name']
+                analysis[step_name] = {
+                    'found': bool(ar['found']),
+                    'keywords': json.loads(ar['keywords']) if ar['keywords'] else [],
+                    'evidence': json.loads(ar['evidence']) if ar['evidence'] else [],
+                    'description': ar['description'] if ar['description'] else '',
+                    'step_score': ar['step_score'] if 'step_score' in ar else 0  # 获取步骤评分
+                }
+                
+                # 获取框架摘要和改进建议（如果存在）
+                if 'framework_summary' in ar and ar['framework_summary']:
+                    analysis[step_name]['framework_summary'] = ar['framework_summary']
+                
+                if 'improvement_suggestions' in ar and ar['improvement_suggestions'] and step_name == '结论':
+                    analysis['improvement_suggestions'] = ar['improvement_suggestions']
+            
+            # 获取完整分析文本和一句话总结
+            full_analysis_row = cursor.execute('''
+            SELECT * FROM report_full_analysis
+            WHERE report_id = ?
+            ''', (report_id,)).fetchone()
+            
+            # 添加摘要数据
+            analysis['summary'] = {
+                'completeness_score': report['completeness_score'],
+                'steps_found': sum(1 for step in analysis.values() if isinstance(step, dict) and step.get('found', False)),
+                'evaluation': get_evaluation_text(report['completeness_score'])
+            }
+            
+            # 添加一句话总结和完整分析文本（如果存在）
+            if full_analysis_row:
+                if 'one_line_summary' in full_analysis_row and full_analysis_row['one_line_summary']:
+                    analysis['summary']['one_line_summary'] = full_analysis_row['one_line_summary']
+                
+                if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
+                    report['full_analysis'] = full_analysis_row['full_analysis_text']
+            
+            # 移除数据库ID，并添加分析结果
+            del report['id']
+            report['analysis'] = analysis
+            reports.append(report)
+        
         if not reports:
             print("数据库中没有研报数据可导出")
             return False
-            
+        
         with open(json_file, 'w', encoding='utf-8') as f:
             json.dump(reports, f, ensure_ascii=False, indent=4)
             
@@ -471,7 +707,12 @@ def export_to_json(json_file='exported_reports.json'):
         return True
     except Exception as e:
         print(f"导出研报数据到JSON时出错: {e}")
+        import traceback
+        traceback.print_exc()
         return False
+    finally:
+        if conn:
+            conn.close()
 
 # 辅助函数，与main.py中相同
 def get_evaluation_text(score):
