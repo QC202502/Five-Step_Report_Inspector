@@ -212,9 +212,26 @@ def parse_reports_from_page(page_source):
                 if not row:
                     continue
                 
-                # 获取行业信息
-                industry_cell = row.find('td').find('a')
-                industry = industry_cell.get_text(strip=True) if industry_cell else "未知行业"
+                # 获取行业信息 - 修正行业信息获取方法
+                cells = row.find_all('td')
+                
+                # 调试：打印单元格数量和内容
+                print(f"找到 {len(cells)} 个单元格")
+                for i, cell in enumerate(cells[:5]):  # 只打印前5个单元格
+                    print(f"单元格 {i}: {cell.get_text(strip=True)}")
+                
+                # 行业信息通常在第一个或第二个单元格
+                industry = "未知行业"
+                if len(cells) > 0:
+                    # 尝试从第一个单元格获取行业
+                    industry_cell = cells[0].find('a')
+                    if industry_cell and industry_cell.get_text(strip=True):
+                        industry = industry_cell.get_text(strip=True)
+                    # 如果第一个单元格没有行业信息，尝试第二个单元格
+                    elif len(cells) > 1:
+                        industry_cell = cells[1].find('a')
+                        if industry_cell and industry_cell.get_text(strip=True):
+                            industry = industry_cell.get_text(strip=True)
                 
                 # 获取评级信息
                 cells = row.find_all('td')
@@ -265,9 +282,25 @@ def parse_reports_from_page(page_source):
                         if len(cells) < 5:
                             continue
                             
-                        # 尝试从单元格中提取研报数据
-                        industry_cell = cells[1].find('a') if len(cells) > 1 else None
-                        industry = industry_cell.get_text(strip=True) if industry_cell else "未知行业"
+                        # 尝试从单元格中提取研报数据 - 修正行业信息获取方法
+                        industry = "未知行业"
+                        
+                        # 调试：打印单元格数量和内容
+                        print(f"备选逻辑-找到 {len(cells)} 个单元格")
+                        for i, cell in enumerate(cells[:5]):  # 只打印前5个单元格
+                            print(f"备选逻辑-单元格 {i}: {cell.get_text(strip=True)}")
+                        
+                        # 行业信息通常在第一个或第二个单元格
+                        if len(cells) > 0:
+                            # 尝试从第一个单元格获取行业
+                            industry_cell = cells[0].find('a')
+                            if industry_cell and industry_cell.get_text(strip=True):
+                                industry = industry_cell.get_text(strip=True)
+                            # 如果第一个单元格没有行业信息，尝试第二个单元格
+                            elif len(cells) > 1:
+                                industry_cell = cells[1].find('a')
+                                if industry_cell and industry_cell.get_text(strip=True):
+                                    industry = industry_cell.get_text(strip=True)
                         
                         report_cell = cells[4].find('a') if len(cells) > 4 else None
                         if not report_cell or not report_cell.get('href') or 'zw_industry.jshtml' not in report_cell.get('href'):
@@ -329,7 +362,7 @@ def parse_reports_from_page(page_source):
                         "title": text,
                         "link": full_link,
                         "abstract": "行业研报",
-                        "industry": "未知",
+                        "industry": "未能确定行业",  # 尝试从标题提取行业信息
                         "rating": "",
                         "org": "",
                         "date": ""

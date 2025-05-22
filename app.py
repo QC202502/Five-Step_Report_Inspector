@@ -7,7 +7,7 @@ import socket
 from main import scrape_research_reports, analyze_with_five_steps, get_report_detail, get_evaluation_text
 
 # 版本常量
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 app = Flask(__name__)
 
