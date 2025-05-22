@@ -1,0 +1,39 @@
+# Python字节码文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+env/
+ENV/
+
+# 数据库文件
+*.db
+*.sqlite3
+*.sqlite
+
+# 日志文件
+*.log
+
+# 本地配置
+instance/
+.env
+.env.*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器和IDE文件
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 生成的研报数据
+research_reports.json
+page_source_*.html
+
+# Flask相关
+flask_session/ 

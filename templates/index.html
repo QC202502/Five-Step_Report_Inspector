@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五步法研报检查器</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">五步法研报检查器</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/stats">统计分析</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="scrapeBtn">实时爬取</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">黄燕铭五步分析法研报评估系统</h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="lead">本系统基于黄燕铭的五步分析法对研究报告进行评估，五步分析法包括：</p>
+                        <ol>
+                            <li><strong>信息</strong> - 收集和整理相关信息，包括公司公告、行业数据、政策变化等</li>
+                            <li><strong>逻辑</strong> - 基于信息进行分析推理，形成对市场或个股的基本判断</li>
+                            <li><strong>超预期</strong> - 寻找市场共识之外的信息点，发现被低估或高估的因素</li>
+                            <li><strong>催化剂</strong> - 找出能够促使价格变动的关键事件或因素</li>
+                            <li><strong>结论</strong> - 给出明确的投资建议，包括评级、目标价等</li>
+                        </ol>
+                        <div class="alert alert-info">
+                            <strong>🚀 Claude增强分析</strong>：本系统基于Claude大语言模型的高级语义分析能力，提供详细、全面的五步法评估结果，远超简单的关键词匹配。
+                        </div>
+                        <div class="alert alert-success">
+                            已分析 <strong>{{ reports|length }}</strong> 份研报，点击"实时爬取"按钮可获取并分析最新研报。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">研报列表</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>研报标题</th>
+                                        <th>行业</th>
+                                        <th>评级</th>
+                                        <th>机构</th>
+                                        <th>日期</th>
+                                        <th>五步法评分</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in reports %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ report.title }}</td>
+                                        <td>{{ report.industry }}</td>
+                                        <td>
+                                            {% if report.rating == '买入' or report.rating == '强烈推荐' %}
+                                                <span class="badge bg-success">{{ report.rating }}</span>
+                                            {% elif report.rating == '增持' or report.rating == '推荐' %}
+                                                <span class="badge bg-primary">{{ report.rating }}</span>
+                                            {% elif report.rating == '中性' or report.rating == '持有' %}
+                                                <span class="badge bg-secondary">{{ report.rating }}</span>
+                                            {% elif report.rating == '减持' or report.rating == '卖出' %}
+                                                <span class="badge bg-danger">{{ report.rating }}</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark">{{ report.rating }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ report.org }}</td>
+                                        <td>{{ report.date }}</td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                {% set score = report.analysis.summary.completeness_score %}
+                                                {% if score >= 80 %}
+                                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                                {% elif score >= 60 %}
+                                                    <div class="progress-bar bg-info" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                                {% elif score >= 40 %}
+                                                    <div class="progress-bar bg-warning" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                                {% else %}
+                                                    <div class="progress-bar bg-danger" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <a href="/report/{{ loop.index0 }}" class="btn btn-sm btn-primary">详情</a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 爬取进度模态框 -->
+    <div class="modal fade" id="scrapeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">数据爬取</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>正在爬取最新研报数据并使用Claude进行智能分析，请稍候...</p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-light py-3 mt-5">
+        <div class="container text-center">
+            <p>黄燕铭五步分析法研报检查器 &copy; 2025</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scrapeBtn = document.getElementById('scrapeBtn');
+            const scrapeModal = new bootstrap.Modal(document.getElementById('scrapeModal'));
+            
+            scrapeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // 显示爬取进度模态框
+                scrapeModal.show();
+                
+                // 发送爬取请求
+                fetch('/scrape')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            // 刷新页面显示新数据
+                            window.location.reload();
+                        } else {
+                            alert('爬取失败: ' + data.message);
+                            scrapeModal.hide();
+                        }
+                    })
+                    .catch(error => {
+                        alert('爬取失败: ' + error);
+                        scrapeModal.hide();
+                    });
+            });
+        });
+    </script>
+</body>
+</html> 

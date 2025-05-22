@@ -1,0 +1,229 @@
+/* 全局样式 */
+body {
+    font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+/* 导航栏品牌样式 */
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.4rem;
+}
+
+/* 卡片样式 */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+    font-weight: 600;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* 表格头部样式 */
+.table-light th {
+    font-weight: 600;
+    background-color: #f2f6fc;
+}
+
+/* 进度条样式 */
+.progress {
+    height: 1.5rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* 徽章样式 */
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4em 0.7em;
+}
+
+/* 页脚样式 */
+footer {
+    border-top: 1px solid #dee2e6;
+}
+
+/* 面包屑样式 */
+.breadcrumb {
+    background-color: transparent;
+    padding: 0.75rem 0;
+}
+
+/* 图表容器样式 */
+.chart-container {
+    margin-bottom: 2rem;
+}
+
+/* 按钮样式 */
+.btn {
+    border-radius: 0.4rem;
+    font-size: 0.9rem;
+}
+
+/* 提醒样式 */
+.alert {
+    border-radius: 0.5rem;
+}
+
+/* 报告内容预览框 */
+.report-content-preview {
+    max-height: 400px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    word-break: break-word;
+    overflow-x: hidden;
+}
+
+/* 自定义样式 */
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+
+.text-primary {
+    color: #0d6efd !important;
+}
+
+.border-primary {
+    border-color: #0d6efd !important;
+}
+
+/* 分析结果卡片样式 */
+.analysis-card {
+    height: 100%;
+    transition: transform 0.2s;
+}
+
+.analysis-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 雷达图样式 */
+.radar-chart-container {
+    padding: 1rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 分析结果表格样式 */
+.analysis-table {
+    border: 1px solid #dee2e6;
+}
+
+.analysis-table th {
+    background-color: #f2f6fc;
+}
+
+.analysis-table tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    h3 {
+        font-size: 1.3rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* 五步法展示样式 */
+.five-step-header {
+    background-color: #f2f8ff;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.five-step-score {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.one-line-summary {
+    background-color: #f8f9fa;
+    border-left: 4px solid #0d6efd;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+}
+
+/* 证据和关键词样式 */
+.evidence-item {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-word;
+}
+
+.keyword-badge {
+    background-color: #e9f2ff;
+    color: #0d6efd;
+    border: 1px solid #c2dcff;
+    font-weight: normal;
+}
+
+/* 研报原文样式 */
+.report-full-content {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    max-height: 600px;
+    overflow-y: auto;
+    word-break: break-word;
+    overflow-x: hidden;
+}
+
+/* 表格单元格样式 */
+.table td, .table th {
+    vertical-align: middle;
+    padding: 0.75rem;
+}
+
+.table td {
+    word-break: break-word;
+    max-width: 300px; /* 限制最大宽度 */
+}
+
+.text-wrap {
+    white-space: normal !important;
+    word-break: break-word !important;
+} 
