@@ -33,6 +33,23 @@
             overflow-y: auto;
             word-break: break-word;
         }
+        
+        /* 预先定义进度条样式，避免模板语法在style标签中造成问题 */
+        .progress-bar-success {
+            background-color: #198754;
+        }
+        
+        .progress-bar-info {
+            background-color: #0dcaf0;
+        }
+        
+        .progress-bar-warning {
+            background-color: #ffc107;
+        }
+        
+        .progress-bar-danger {
+            background-color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -119,19 +136,16 @@
                             <div class="col-md-6">
                                 <div class="card bg-light mb-4 analysis-card">
                                     <div class="card-body five-step-header">
-                                        <h4 class="mb-2">总体评分：<span class="five-step-score">{{ report.analysis.summary.completeness_score }}%</span></h4>
+                                        <h4 class="mb-2">总体评分：<span class="five-step-score">{{ score }}%</span></h4>
                                         <p class="mb-2">{{ report.analysis.summary.evaluation }}</p>
+                                        
+                                        <!-- 使用后端预处理的样式类 -->
                                         <div class="progress mb-4" style="height: 25px;">
-                                            {% set score = report.analysis.summary.completeness_score %}
-                                            {% if score >= 80 %}
-                                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% elif score >= 60 %}
-                                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% elif score >= 40 %}
-                                                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% else %}
-                                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% endif %}
+                                            <div class="progress-bar {{ progress_class }}" role="progressbar" 
+                                                 style="width: {{ score }}%" 
+                                                 aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
+                                                {{ score }}%
+                                            </div>
                                         </div>
                                         
                                         {% if report.analysis_method == "Claude增强" and report.analysis.summary.one_line_summary %}
@@ -238,19 +252,6 @@
                 </div>
             </div>
         </div>
-        
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">报告摘要</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="report-content-preview p-3">{{ report.content_preview }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <footer class="bg-light py-3 mt-5">
@@ -260,17 +261,17 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
+        // 使用JSON.parse避免模板语法在JavaScript中的问题
         document.addEventListener('DOMContentLoaded', function() {
-            var steps = ['信息', '逻辑', '超预期', '催化剂', '结论'];
-            var stepsData = [
-                {% for step in steps_stats %}
-                    {{ 100 if steps_stats[step].found else 0 }},
-                {% endfor %}
-            ];
+            var stepsData = {{ radar_data|tojson }};
+            var steps = {{ steps_order|tojson }};
             
+            // 绘制雷达图
             drawRadarChart('radarChart', stepsData, steps);
             
+            // 设置爬取按钮事件
             var scrapeBtn = document.getElementById('scrapeBtn');
             if (scrapeBtn) {
                 scrapeBtn.addEventListener('click', function(e) {

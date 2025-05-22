@@ -3,12 +3,34 @@ from flask import Flask, render_template, jsonify, request
 import json
 import os
 import sys
+import socket
 from main import scrape_research_reports, analyze_with_five_steps, get_report_detail, get_evaluation_text
 
 # 版本常量
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 app = Flask(__name__)
+
+# 检查端口是否可用
+def is_port_available(port):
+    """检查指定端口是否可用"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('127.0.0.1', port))
+            return True
+        except OSError:
+            return False
+
+# 找到一个可用的端口
+def find_available_port(start_port=5001, max_attempts=10):
+    """从指定端口开始查找可用端口"""
+    port = start_port
+    for _ in range(max_attempts):
+        if is_port_available(port):
+            return port
+        port += 1
+    # 如果找不到可用端口，返回一个较高的端口，希望它是可用的
+    return 8080
 
 # 加载已保存的研报数据
 def load_reports():
@@ -29,6 +51,7 @@ def report_detail(report_id):
     reports = load_reports()
     if 0 <= report_id < len(reports):
         report = reports[report_id]
+        
         # 获取五步法分析统计
         steps_stats = {}
         for step in ["信息", "逻辑", "超预期", "催化剂", "结论"]:
@@ -38,7 +61,31 @@ def report_detail(report_id):
                 "evidence": report["analysis"][step]["evidence"],
                 "description": report["analysis"][step]["description"]
             }
-        return render_template('report_detail.html', report=report, steps_stats=steps_stats)
+            
+        # 预处理雷达图数据
+        steps_order = ["信息", "逻辑", "超预期", "催化剂", "结论"]
+        radar_data = [100 if steps_stats[step]["found"] else 0 for step in steps_order]
+        
+        # 确定进度条样式
+        score = report["analysis"]["summary"]["completeness_score"]
+        if score >= 80:
+            progress_class = "bg-success"
+        elif score >= 60:
+            progress_class = "bg-info"
+        elif score >= 40:
+            progress_class = "bg-warning"
+        else:
+            progress_class = "bg-danger"
+        
+        return render_template(
+            'report_detail.html', 
+            report=report, 
+            steps_stats=steps_stats,
+            steps_order=steps_order,
+            radar_data=radar_data,
+            progress_class=progress_class,
+            score=score
+        )
     return "报告不存在", 404
 
 # API端点 - 获取所有研报数据
@@ -187,4 +234,7 @@ def stats():
     )
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    # 查找可用端口
+    port = find_available_port()
+    print(f"启动Flask应用，使用端口: {port}")
+    app.run(debug=True, port=port) 

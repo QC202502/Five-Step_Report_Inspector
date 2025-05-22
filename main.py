@@ -122,9 +122,9 @@ def get_report_detail(url):
                     if paragraphs:
                         content = ' '.join([p.get_text(strip=True) for p in paragraphs])
         
-        # 如果内容太长，截取前5000个字符(增加字符限制以获取更多内容)
-        if len(content) > 5000:
-            content = content[:5000] + "..."
+        # 删除字符限制，显示完整内容
+        # if len(content) > 5000:
+        #     content = content[:5000] + "..."
             
         if content:
             print(f"成功获取研报内容，长度: {len(content)} 字符")
