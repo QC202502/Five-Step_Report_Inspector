@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}页面未找到 - 五步法研报检查器{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 text-center">
+        <div class="card shadow-sm">
+            <div class="card-body p-5">
+                <h1 class="display-1 text-muted mb-4">404</h1>
+                <h2 class="mb-4">页面未找到</h2>
+                <p class="mb-4 text-muted">很抱歉，您请求的页面不存在或已被移动。</p>
+                <div class="my-4">
+                    <i class="fas fa-exclamation-triangle fa-4x text-warning mb-4"></i>
+                </div>
+                <a href="/" class="btn btn-primary">
+                    <i class="fas fa-home me-2"></i>返回首页
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -73,7 +73,7 @@ def get_report_detail(url):
     print(f"正在获取研报详情: {url}")
     
     try:
-        # 使用requests获取研报详情页
+        # 首先尝试使用requests获取研报详情页
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -93,47 +93,200 @@ def get_report_detail(url):
         # 尝试提取研报内容
         content = ""
         
-        # 检查特定的zw_industry页面结构
-        # 1. 尝试获取研报标题和概要
-        title_div = soup.find('div', class_='report-header')
-        title = title_div.find('h1').get_text(strip=True) if title_div and title_div.find('h1') else ""
-        
-        # 2. 尝试获取研报正文
-        content_div = soup.find('div', class_='report-content')
-        if content_div:
-            # 移除不需要的元素
-            [s.extract() for s in content_div.select('style, script')]
-            content = content_div.get_text(strip=True)
+        # 优先查找 ctx-content 类，这是东方财富网研报内容的主要容器
+        ctx_content = soup.find('div', class_='ctx-content')
+        if ctx_content:
+            # 提取所有段落文本
+            paragraphs = ctx_content.find_all('p')
+            if paragraphs:
+                content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                print("成功从ctx-content提取研报内容")
         
         # 如果上述方法失败，尝试其他可能的内容容器
         if not content:
-            # 尝试查找研报正文内容 (可能的其他标记)
-            content_div = soup.find('div', class_='newsContent')
+            # 检查特定的zw_industry页面结构
+            content_div = soup.find('div', class_='report-content')
             if content_div:
+                # 移除不需要的元素
+                [s.extract() for s in content_div.select('style, script')]
                 content = content_div.get_text(strip=True)
+                print("成功从report-content提取研报内容")
             else:
-                # 尝试其他可能的内容容器
-                content_div = soup.find('div', id='ContentBody')
+                # 尝试查找研报正文内容 (可能的其他标记)
+                content_div = soup.find('div', class_='newsContent')
                 if content_div:
                     content = content_div.get_text(strip=True)
+                    print("成功从newsContent提取研报内容")
                 else:
-                    # 尝试查找所有段落
-                    paragraphs = soup.find_all('p')
-                    if paragraphs:
-                        content = ' '.join([p.get_text(strip=True) for p in paragraphs])
-        
-        # 删除字符限制，显示完整内容
-        # if len(content) > 5000:
-        #     content = content[:5000] + "..."
+                    # 尝试其他可能的内容容器
+                    content_div = soup.find('div', id='ContentBody')
+                    if content_div:
+                        content = content_div.get_text(strip=True)
+                        print("成功从ContentBody提取研报内容")
+                    else:
+                        # 尝试zw-content类
+                        zw_content = soup.find('div', class_='zw-content')
+                        if zw_content:
+                            # 查找其中的内容部分
+                            ctx_box = zw_content.find('div', class_='ctx-box')
+                            if ctx_box:
+                                paragraphs = ctx_box.find_all('p')
+                                if paragraphs:
+                                    content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                                    print("成功从zw-content/ctx-box提取研报内容")
             
-        if content:
-            print(f"成功获取研报内容，长度: {len(content)} 字符")
-            # 保存前100个字符用于调试
-            preview = content[:100].replace('\n', ' ')
+        if content:  # 如果通过requests获取到了任何内容
+            print(f"成功通过requests获取研报内容，长度: {len(content)} 字符")
+            # 记录完整内容长度，同时显示部分预览用于调试
+            preview = content[:100].replace('\n', ' ') if len(content) > 100 else content.replace('\n', ' ')
             print(f"内容预览: {preview}...")
+            return content # 直接返回，不再检查长度是否大于500
         else:
-            print("未找到研报内容")
-            
+            # 只有当requests完全没有获取到内容时，才打印这条信息并尝试Selenium
+            print(f"使用requests未能获取到研报内容，尝试使用Selenium方法...")
+        
+        # 如果requests未能获取到内容，尝试使用Selenium获取完整内容
+        if chrome_driver_available:
+            try:
+                print("使用Selenium获取研报详情...")
+                
+                # 设置Chrome选项
+                chrome_options = Options()
+                chrome_options.add_argument("--headless")  # 无头模式
+                chrome_options.add_argument("--disable-gpu")
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                
+                # 创建Service对象
+                service = Service(executable_path=binary_path)
+                
+                # 初始化Chrome浏览器
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                
+                try:
+                    # 访问URL
+                    driver.get(url)
+                    
+                    # 等待页面加载
+                    time.sleep(5)  # 等待JavaScript加载
+                    
+                    # 获取页面源码
+                    page_source = driver.page_source
+                    
+                    # 使用BeautifulSoup解析
+                    soup = BeautifulSoup(page_source, 'html.parser')
+                    
+                    # 保存页面源码以便调试
+                    with open("report_detail_selenium.html", "w", encoding="utf-8") as f:
+                        f.write(page_source)
+                    print("已保存研报详情页源码到 report_detail_selenium.html 文件")
+                    
+                    # 尝试提取研报内容 - 使用更多针对性的选择器
+                    content = ""
+                    
+                    # 优先查找 ctx-content 类，这是东方财富网研报内容的主要容器
+                    ctx_content = soup.find('div', class_='ctx-content')
+                    if ctx_content:
+                        # 提取所有段落文本
+                        paragraphs = ctx_content.find_all('p')
+                        if paragraphs:
+                            content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                            print("成功从ctx-content提取研报内容")
+                            
+                    # 如果未找到ctx-content，尝试其他容器
+                    if not content:
+                        # 尝试获取zw-content下的内容
+                        zw_content = soup.find('div', class_='zw-content')
+                        if zw_content:
+                            # 查找其中的内容部分
+                            ctx_box = zw_content.find('div', class_='ctx-box')
+                            if ctx_box:
+                                paragraphs = ctx_box.find_all('p')
+                                if paragraphs:
+                                    content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                                    print("成功从zw-content/ctx-box提取研报内容")
+                            
+                        # 如果还是没有找到，尝试更多可能的容器
+                        if not content:
+                            # 尝试研报正文内容的其他可能位置
+                            content_div = soup.find('div', class_='report-content')
+                            if content_div:
+                                [s.extract() for s in content_div.select('style, script')]
+                                content = content_div.get_text(strip=True)
+                                print("成功从report-content提取研报内容")
+                            else:
+                                content_div = soup.find('div', class_='newsContent')
+                                if content_div:
+                                    content = content_div.get_text(strip=True)
+                                    print("成功从newsContent提取研报内容")
+                                else:
+                                    content_div = soup.find('div', id='ContentBody')
+                                    if content_div:
+                                        content = content_div.get_text(strip=True)
+                                        print("成功从ContentBody提取研报内容")
+                                    else:
+                                        # 尝试提取class="content"的内容
+                                        content_divs = soup.find_all('div', class_='content')
+                                        if content_divs:
+                                            for div in content_divs:
+                                                # 检查是否包含有意义的文本内容
+                                                text = div.get_text(strip=True)
+                                                if len(text) > 500:  # 有意义的内容通常较长
+                                                    content = text
+                                                    print("成功从content类提取研报内容")
+                                                    break
+                    
+                    # 如果上述所有方法都失败，尝试清理的方式提取body内容
+                    if not content or len(content) < 500:
+                        body = soup.find('body')
+                        if body:
+                            # 去除脚本、样式、导航、页眉、页脚等
+                            for tag in body.select('script, style, header, footer, nav, .header, .footer, .nav, .menu, .sidebar, .ad'):
+                                tag.extract()
+                            
+                            # 尝试仅提取正文区域
+                            main_content = body.find('div', class_=['main', 'main-content', 'content-main', 'article', 'article-content'])
+                            if main_content:
+                                content = main_content.get_text(strip=True)
+                                print("成功从主内容区域提取研报内容")
+                            else:
+                                # 如果没有明确的主内容区域，提取所有段落
+                                paragraphs = body.find_all('p')
+                                if paragraphs and len(paragraphs) > 5:  # 有意义的内容通常有多个段落
+                                    content = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                                    print("成功从所有段落提取研报内容")
+                                else:
+                                    # 最后的方法：提取清理后的body内容
+                                    content = body.get_text(strip=True)
+                                    # 移除多余空格
+                                    content = re.sub(r'\s+', ' ', content).strip()
+                                    print("成功提取清理后的页面文本")
+                    
+                    if content:
+                        print(f"使用Selenium成功获取研报内容，长度: {len(content)} 字符")
+                        preview = content[:100].replace('\n', ' ') if len(content) > 100 else content.replace('\n', ' ')
+                        print(f"内容预览: {preview}...")
+                    else:
+                        print("使用Selenium未能找到研报内容")
+                    
+                except Exception as e:
+                    print(f"Selenium获取研报详情时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+                finally:
+                    # 关闭浏览器
+                    driver.quit()
+                
+                # 如果Selenium方法获取到内容，则返回，否则返回原来的内容
+                if content:
+                    return content
+            except Exception as e:
+                print(f"使用Selenium获取研报详情时出错: {e}")
+                import traceback
+                traceback.print_exc()
+                
+        # 如果都失败了，返回之前获取的内容（即使可能不完整）
+        print("返回通过requests获取的研报内容")
         return content
     except Exception as e:
         print(f"获取研报详情时出错: {e}")
@@ -582,6 +735,12 @@ def save_results(data, filename="research_reports.json"):
     """
     将爬取和分析结果保存到 JSON 文件。
     """
+    # 确保每个报告都包含 full_analysis 字段
+    for report in data:
+        if 'analysis' in report and not 'full_analysis' in report:
+            # 如果没有完整分析文本，添加一个标记
+            report['full_analysis'] = report.get('full_analysis', '未获取到完整分析文本')
+    
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
     print(f"结果已保存到 {filename}")

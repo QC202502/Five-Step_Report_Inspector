@@ -304,8 +304,8 @@ def get_reports_from_db(limit=100, offset=0):
                 if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
                     report['full_analysis'] = full_analysis_row['full_analysis_text']
             
-            # 移除数据库ID，并添加分析结果
-            del report['id']
+            # 不再删除id字段，保留它供app.py使用
+            # del report['id']  
             report['analysis'] = analysis
             reports.append(report)
             
@@ -465,8 +465,8 @@ def get_reports_by_industry(industry, limit=100):
                 if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
                     report['full_analysis'] = full_analysis_row['full_analysis_text']
             
-            # 移除数据库ID，并添加分析结果
-            del report['id']
+            # 不再删除id字段，保留它供app.py使用
+            # del report['id']
             report['analysis'] = analysis
             reports.append(report)
             
@@ -553,8 +553,8 @@ def search_reports(keyword, limit=100):
                 if 'full_analysis_text' in full_analysis_row and full_analysis_row['full_analysis_text']:
                     report['full_analysis'] = full_analysis_row['full_analysis_text']
             
-            # 移除数据库ID，并添加分析结果
-            del report['id']
+            # 不再删除id字段，保留它供app.py使用
+            # del report['id']
             report['analysis'] = analysis
             reports.append(report)
             
@@ -727,6 +727,108 @@ def get_evaluation_text(score):
         return "研报仅包含少量五步分析法要素，分析不够全面"
     else:
         return "研报几乎未应用五步分析法，分析要素严重不足"
+
+# 添加从app.py中需要的两个函数
+
+def get_analysis_results_for_report(report_id):
+    """
+    获取指定报告的五步法分析结果
+    
+    参数:
+    report_id (int): 报告ID
+    
+    返回:
+    list: 分析结果步骤列表，每个步骤都是一个字典
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # 查询分析结果
+        analysis_rows = cursor.execute('''
+        SELECT * FROM analysis_results
+        WHERE report_id = ?
+        ORDER BY step_name
+        ''', (report_id,)).fetchall()
+        
+        steps = []
+        for ar in analysis_rows:
+            step = {
+                "step_name": ar['step_name'],
+                "found": bool(ar['found']),
+                "found_summary": "",  # 默认值
+                "missing_summary": "",  # 默认值
+                "step_score": ar['step_score'] if 'step_score' in ar else 0
+            }
+            
+            # 添加框架摘要
+            if 'framework_summary' in ar and ar['framework_summary']:
+                step["framework_summary"] = ar['framework_summary']
+            else:
+                step["framework_summary"] = "未提供框架摘要"
+            
+            # 添加改进建议
+            if 'improvement_suggestions' in ar and ar['improvement_suggestions']:
+                step["improvement_suggestions"] = ar['improvement_suggestions']
+            else:
+                step["improvement_suggestions"] = "未提供改进建议"
+            
+            # 从证据中提取实例
+            try:
+                evidence = json.loads(ar['evidence']) if ar['evidence'] else []
+                step["found_examples"] = evidence[:3]  # 最多取3个例子
+            except:
+                step["found_examples"] = []
+            
+            steps.append(step)
+        
+        return steps
+        
+    except Exception as e:
+        print(f"获取报告分析结果时出错: {e}")
+        return []
+    finally:
+        conn.close()
+
+def get_full_analysis_for_report(report_id):
+    """
+    获取指定报告的完整分析文本和一句话总结
+    
+    参数:
+    report_id (int): 报告ID
+    
+    返回:
+    dict: 包含完整分析文本和一句话总结的字典
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        
+        # 查询完整分析
+        result = cursor.execute('''
+        SELECT * FROM report_full_analysis
+        WHERE report_id = ?
+        ''', (report_id,)).fetchone()
+        
+        if result:
+            return {
+                "full_analysis_text": result['full_analysis_text'] if 'full_analysis_text' in result else "",
+                "one_line_summary": result['one_line_summary'] if 'one_line_summary' in result else ""
+            }
+        else:
+            return {
+                "full_analysis_text": "",
+                "one_line_summary": ""
+            }
+            
+    except Exception as e:
+        print(f"获取报告完整分析时出错: {e}")
+        return {
+            "full_analysis_text": "",
+            "one_line_summary": ""
+        }
+    finally:
+        conn.close()
 
 # 初始化数据库
 if __name__ == "__main__":

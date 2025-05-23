@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}关于 - 五步法研报检查器{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i> 首页</a></li>
+            <li class="breadcrumb-item active" aria-current="page">关于</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-info-circle me-2"></i>关于五步法研报检查器</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-4 text-center">
+                        <div class="p-3">
+                            <i class="fas fa-chart-line fa-5x text-primary mb-3"></i>
+                            <h4 class="mb-0">v{{ version }}</h4>
+                            <p class="text-muted">当前版本</p>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <h5>项目描述</h5>
+                        <p>五步法研报检查器是一个用于分析金融研究报告的工具，基于黄燕铭的五步分析法对研报质量进行评估。该工具使用Claude大语言模型进行深度语义分析，帮助投资者和分析师评估研报的完整性和质量。</p>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <h5>黄燕铭五步法</h5>
+                <p>五步法是由著名分析师黄燕铭提出的系统化研究方法，包括以下五个步骤：</p>
+                
+                <div class="row mb-4">
+                    {% set step_icons = ["fa-info-circle", "fa-brain", "fa-lightbulb", "fa-rocket", "fa-flag-checkered"] %}
+                    {% set step_colors = ["primary", "success", "warning", "info", "danger"] %}
+                    {% set steps = ["信息", "逻辑", "超预期", "催化剂", "结论"] %}
+                    {% set descriptions = [
+                        "收集和整理相关信息，包括公司公告、行业数据、政策变化等基础数据。",
+                        "基于信息进行分析推理，形成对市场或个股的基本判断和逻辑框架。",
+                        "寻找市场共识之外的信息点，发现被低估或高估的因素。",
+                        "找出能够促使价格变动的关键事件或因素，判断时间窗口。",
+                        "给出明确的投资建议，包括评级、目标价和风险提示。"
+                    ] %}
+                    
+                    {% for step in range(5) %}
+                    <div class="col-md-12 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-shrink-0 me-3">
+                                        <i class="fas {{ step_icons[step] }} fa-2x text-{{ step_colors[step] }}"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-1">第{{ loop.index }}步: {{ steps[step] }}</h5>
+                                        <p class="mb-0">{{ descriptions[step] }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <hr class="my-4">
+                
+                <h5>技术特点</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-robot text-primary me-2"></i>Claude增强分析</h6>
+                                <p class="mb-0 small">利用Claude大语言模型进行深度语义分析，远超关键词匹配的方法，能够理解研报的上下文和深层含义。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-database text-primary me-2"></i>数据持久化存储</h6>
+                                <p class="mb-0 small">采用SQLite数据库存储研报数据和分析结果，支持大量研报数据的高效管理和查询。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-chart-pie text-primary me-2"></i>可视化统计分析</h6>
+                                <p class="mb-0 small">提供直观的统计图表，展示行业分布、评分分布等多维度数据，帮助用户快速理解数据趋势。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-search text-primary me-2"></i>全文搜索功能</h6>
+                                <p class="mb-0 small">支持对研报标题、内容、行业等多字段的关键词搜索，方便用户快速找到所需信息。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <h5>使用说明</h5>
+                <p>1. 在首页点击"爬取最新研报"按钮获取最新的研究报告数据。</p>
+                <p>2. 系统将自动对研报进行五步法分析，并计算完整度评分。</p>
+                <p>3. 通过表格浏览研报列表，点击"详情"查看具体的分析结果。</p>
+                <p>4. 使用顶部搜索框搜索特定关键词，或通过行业和机构进行过滤。</p>
+                <p>5. 查看统计分析页面，了解整体研报质量分布情况。</p>
+            </div>
+            <div class="card-footer text-center">
+                <p class="mb-0 text-muted">© 2023 五步法研报检查器 - v{{ version }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

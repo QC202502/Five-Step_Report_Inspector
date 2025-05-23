@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ report.title }} - 五步法研报检查器{% endblock %}
+{% block title %}研报分析 - {{ report.title }}{% endblock %}
 
 {% block extra_head %}
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
@@ -51,194 +51,377 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row mb-3">
-        <div class="col-md-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="/">首页</a></li>
-                    <li class="breadcrumb-item active">研报详情</li>
-                </ol>
-            </nav>
-        </div>
-    </div>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/">首页</a></li>
+            <li class="breadcrumb-item active" aria-current="page">研报详情</li>
+        </ol>
+    </nav>
 
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">研报详情</h4>
-                    <a href="{{ report.link }}" target="_blank" class="btn btn-light btn-sm">查看原文</a>
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">{{ report.title }}</h4>
+            <span class="badge bg-light text-dark">{{ report.industry }}</span>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <p><strong>机构：</strong> {{ report.org }}</p>
+                    <p><strong>日期：</strong> {{ report.date }}</p>
                 </div>
-                <div class="card-body">
-                    <h2 class="mb-3">{{ report.title }}</h2>
+                <div class="col-md-6">
+                    <p><strong>评级：</strong> {{ report.rating }}</p>
+                    <p><strong>股票：</strong> {{ report.stock_name }} ({{ report.stock_code }})</p>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h5>摘要</h5>
+                <p>{{ report.abstract }}</p>
+            </div>
+            
+            <!-- 分析器选择 -->
+            <div class="mb-4">
+                <h5>分析结果</h5>
+                <ul class="nav nav-tabs" id="analyzerTabs" role="tablist">
+                    {% if claude_analysis %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="claude-tab" data-bs-toggle="tab" data-bs-target="#claude" type="button" role="tab" aria-controls="claude" aria-selected="true">Claude分析</button>
+                    </li>
+                    {% endif %}
                     
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <strong>行业：</strong> <a href="/industry/{{ report.industry }}">{{ report.industry }}</a>
-                        </div>
-                        <div class="col-md-3">
-                            <strong>评级：</strong> 
-                            {% if report.rating == '买入' or report.rating == '强烈推荐' %}
-                                <span class="badge bg-success">{{ report.rating }}</span>
-                            {% elif report.rating == '增持' or report.rating == '推荐' %}
-                                <span class="badge bg-primary">{{ report.rating }}</span>
-                            {% elif report.rating == '中性' or report.rating == '持有' %}
-                                <span class="badge bg-secondary">{{ report.rating }}</span>
-                            {% elif report.rating == '减持' or report.rating == '卖出' %}
-                                <span class="badge bg-danger">{{ report.rating }}</span>
-                            {% else %}
-                                <span class="badge bg-light text-dark">{{ report.rating }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-3">
-                            <strong>发布机构：</strong> {{ report.org }}
-                        </div>
-                        <div class="col-md-3">
-                            <strong>发布日期：</strong> {{ report.date }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <h3 class="mb-3">五步法分析结果</h3>
-            <div class="card">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card bg-light mb-4 analysis-card">
-                                <div class="card-body five-step-header">
-                                    <h4 class="mb-2">总体评分：<span class="five-step-score">{{ score }}%</span></h4>
-                                    <p class="mb-2">{{ report.analysis.summary.evaluation }}</p>
-                                    
-                                    <!-- 使用后端预处理的样式类 -->
-                                    <div class="progress mb-4" style="height: 25px;">
-                                        <div class="progress-bar {{ progress_class }}" role="progressbar" 
-                                             style="width: {{ score }}%" 
-                                             aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
-                                            {{ score }}%
+                    {% if deepseek_analysis %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not claude_analysis %}active{% endif %}" id="deepseek-tab" data-bs-toggle="tab" data-bs-target="#deepseek" type="button" role="tab" aria-controls="deepseek" aria-selected="{% if not claude_analysis %}true{% else %}false{% endif %}">DeepSeek分析</button>
+                    </li>
+                    {% endif %}
+                    
+                    {% if not claude_analysis and not deepseek_analysis %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="no-analysis-tab" data-bs-toggle="tab" data-bs-target="#no-analysis" type="button" role="tab" aria-controls="no-analysis" aria-selected="true">暂无分析</button>
+                    </li>
+                    {% endif %}
+                </ul>
+                
+                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="analyzerTabsContent">
+                    {% if claude_analysis %}
+                    <div class="tab-pane fade show active" id="claude" role="tabpanel" aria-labelledby="claude-tab">
+                        <!-- Claude分析结果 -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0">总体评价</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6>完整度评分</h6>
+                                            <span class="badge bg-primary">{{ claude_analysis.completeness_score }}</span>
                                         </div>
+                                        <p>{{ claude_analysis.evaluation }}</p>
+                                        <p class="fw-bold">一句话总结：</p>
+                                        <p>{{ claude_analysis.one_line_summary }}</p>
                                     </div>
-                                    
-                                    {% if report.analysis_method == "Claude增强" and report.analysis.summary.one_line_summary %}
-                                    <div class="mt-3">
-                                        <h5>一句话总结：</h5>
-                                        <p class="one-line-summary">{{ report.analysis.summary.one_line_summary }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0">五步法雷达图</h5>
                                     </div>
-                                    {% endif %}
+                                    <div class="card-body">
+                                        <canvas id="claudeRadarChart" width="400" height="300"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="card h-100 analysis-card">
-                                <div class="card-body radar-chart-container" style="height: 300px;">
-                                    <canvas id="radarChart"></canvas>
+                        
+                        <!-- 各步骤详细分析 -->
+                        <div class="accordion" id="claudeStepsAccordion">
+                            {% for step_name, step_data in claude_analysis.steps.items() %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="claude-heading-{{ loop.index }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#claude-collapse-{{ loop.index }}" aria-expanded="false" aria-controls="claude-collapse-{{ loop.index }}">
+                                        {{ step_name }} - 评分: {{ step_data.step_score }}
+                                    </button>
+                                </h2>
+                                <div id="claude-collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="claude-heading-{{ loop.index }}" data-bs-parent="#claudeStepsAccordion">
+                                    <div class="accordion-body">
+                                        <p><strong>描述：</strong> {{ step_data.description }}</p>
+                                        {% if step_data.framework_summary %}
+                                        <p><strong>框架梳理：</strong> {{ step_data.framework_summary }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- 改进建议 -->
+                        {% if claude_analysis.improvement_suggestions %}
+                        <div class="card mt-3">
+                            <div class="card-header bg-warning">
+                                <h5 class="mb-0">改进建议</h5>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group">
+                                    {% for suggestion in claude_analysis.improvement_suggestions %}
+                                    <li class="list-group-item">
+                                        <strong>{{ suggestion.point }}：</strong> {{ suggestion.suggestion }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if deepseek_analysis %}
+                    <div class="tab-pane fade {% if not claude_analysis %}show active{% endif %}" id="deepseek" role="tabpanel" aria-labelledby="deepseek-tab">
+                        <!-- DeepSeek分析结果 -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">总体评价</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6>完整度评分</h6>
+                                            <span class="badge bg-primary">{{ deepseek_analysis.completeness_score }}</span>
+                                        </div>
+                                        <p>{{ deepseek_analysis.evaluation }}</p>
+                                        <p class="fw-bold">一句话总结：</p>
+                                        <p>{{ deepseek_analysis.one_line_summary }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0">五步法雷达图</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="deepseekRadarChart" width="400" height="300"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- 各步骤详细分析 -->
+                        <div class="accordion" id="deepseekStepsAccordion">
+                            {% for step_name, step_data in deepseek_analysis.steps.items() %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="deepseek-heading-{{ loop.index }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#deepseek-collapse-{{ loop.index }}" aria-expanded="false" aria-controls="deepseek-collapse-{{ loop.index }}">
+                                        {{ step_name }} - 评分: {{ step_data.step_score }}
+                                    </button>
+                                </h2>
+                                <div id="deepseek-collapse-{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="deepseek-heading-{{ loop.index }}" data-bs-parent="#deepseekStepsAccordion">
+                                    <div class="accordion-body">
+                                        <p><strong>描述：</strong> {{ step_data.description }}</p>
+                                        {% if step_data.framework_summary %}
+                                        <p><strong>框架梳理：</strong> {{ step_data.framework_summary }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- 改进建议 -->
+                        {% if deepseek_analysis.improvement_suggestions %}
+                        <div class="card mt-3">
+                            <div class="card-header bg-warning">
+                                <h5 class="mb-0">改进建议</h5>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group">
+                                    {% for suggestion in deepseek_analysis.improvement_suggestions %}
+                                    <li class="list-group-item">
+                                        <strong>{{ suggestion.point }}：</strong> {{ suggestion.suggestion }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-
-                    <div class="row mt-4">
-                        <div class="col-md-12">
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-hover analysis-table">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th style="width: 10%">分析步骤</th>
-                                            <th style="width: 10%" class="text-center">是否应用</th>
-                                            <th style="width: 20%">匹配关键词</th>
-                                            <th style="width: 40%">证据</th>
-                                            <th style="width: 20%">说明</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for step, info in steps_stats.items() %}
-                                        <tr>
-                                            <td><strong>{{ step }}</strong></td>
-                                            <td class="text-center">
-                                                {% if info.found %}
-                                                    <span class="badge bg-success">✓</span>
-                                                {% else %}
-                                                    <span class="badge bg-danger">✗</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if info.keywords %}
-                                                    {% for keyword in info.keywords %}
-                                                        <span class="badge keyword-badge me-1">{{ keyword }}</span>
-                                                    {% endfor %}
-                                                {% else %}
-                                                    <span class="text-muted">无匹配关键词</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-wrap">
-                                                {% if info.evidence %}
-                                                    <ul class="mb-0 ps-3">
-                                                        {% for evidence in info.evidence %}
-                                                            <li class="evidence-item">{{ evidence }}</li>
-                                                        {% endfor %}
-                                                    </ul>
-                                                {% else %}
-                                                    <span class="text-muted">无证据</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ info.description }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
+                    {% endif %}
+                    
+                    {% if not claude_analysis and not deepseek_analysis %}
+                    <div class="tab-pane fade show active" id="no-analysis" role="tabpanel" aria-labelledby="no-analysis-tab">
+                        <div class="alert alert-info">
+                            <p>该研报尚未进行五步法分析，请点击下方按钮进行分析。</p>
+                            <div class="d-flex gap-2">
+                                <a href="/analyze/{{ report.id }}?analyzer=claude" class="btn btn-primary">使用Claude分析</a>
+                                <a href="/analyze/{{ report.id }}?analyzer=deepseek" class="btn btn-success">使用DeepSeek分析</a>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h5>研报内容</h5>
+                <div class="report-content border p-3 rounded" style="max-height: 500px; overflow-y: auto;">
+                    {{ report.full_content | safe }}
                 </div>
             </div>
         </div>
-    </div>
-    
-    {% if report.analysis_method == "Claude增强" and report.full_analysis %}
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Claude增强分析详情</h5>
-                </div>
-                <div class="card-body">
-                    <div class="claude-analysis p-3 bg-light rounded">
-                        {{ report.full_analysis|safe|replace('\n', '<br>')|replace('## ', '<h5>')|replace('#', '</h5>')|replace('|', '&#124;') }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">报告摘要</h5>
-                </div>
-                <div class="card-body">
-                    <div class="report-full-content p-3 bg-light rounded">{{ report.full_content if report.full_content else report.content_preview }}</div>
-                </div>
-            </div>
+        <div class="card-footer">
+            <a href="/" class="btn btn-secondary">返回列表</a>
+            {% if report.link %}
+            <a href="{{ report.link }}" target="_blank" class="btn btn-primary">查看原文</a>
+            {% endif %}
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // 使用JSON.parse避免模板语法在JavaScript中的问题
-    document.addEventListener('DOMContentLoaded', function() {
-        var stepsData = {{ radar_data|tojson }};
-        var steps = {{ steps_order|tojson }};
-        
-        // 绘制雷达图
-        drawRadarChart('radarChart', stepsData, steps);
+document.addEventListener('DOMContentLoaded', function() {
+    {% if claude_analysis %}
+    // Claude雷达图
+    const claudeCtx = document.getElementById('claudeRadarChart').getContext('2d');
+    new Chart(claudeCtx, {
+        type: 'radar',
+        data: {
+            labels: ['信息', '逻辑', '超预期', '催化剂', '结论'],
+            datasets: [{
+                label: '五步法评分',
+                data: [
+                    {{ claude_analysis.steps.信息.step_score }},
+                    {{ claude_analysis.steps.逻辑.step_score }},
+                    {{ claude_analysis.steps.超预期.step_score }},
+                    {{ claude_analysis.steps.催化剂.step_score }},
+                    {{ claude_analysis.steps.结论.step_score }}
+                ],
+                fill: true,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgb(54, 162, 235)',
+                pointBackgroundColor: 'rgb(54, 162, 235)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(54, 162, 235)'
+            }]
+        },
+        options: {
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: 100
+                }
+            }
+        }
     });
+    {% endif %}
+    
+    {% if deepseek_analysis %}
+    // DeepSeek雷达图
+    const deepseekCtx = document.getElementById('deepseekRadarChart').getContext('2d');
+    new Chart(deepseekCtx, {
+        type: 'radar',
+        data: {
+            labels: ['信息', '逻辑', '超预期', '催化剂', '结论'],
+            datasets: [{
+                label: '五步法评分',
+                data: [
+                    {{ deepseek_analysis.steps.信息.step_score }},
+                    {{ deepseek_analysis.steps.逻辑.step_score }},
+                    {{ deepseek_analysis.steps.超预期.step_score }},
+                    {{ deepseek_analysis.steps.催化剂.step_score }},
+                    {{ deepseek_analysis.steps.结论.step_score }}
+                ],
+                fill: true,
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgb(75, 192, 192)',
+                pointBackgroundColor: 'rgb(75, 192, 192)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(75, 192, 192)'
+            }]
+        },
+        options: {
+            scales: {
+                r: {
+                    angleLines: {
+                        display: true
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: 100
+                }
+            }
+        }
+    });
+    {% endif %}
+});
 </script>
+
+<style>
+.card {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.radar-chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+.content-preview {
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.5;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.card-header .btn-light {
+    border: none;
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.card-header .btn-light:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 五步法卡片特殊颜色 */
+.text-primary {
+    color: #007bff !important;
+}
+.text-success {
+    color: #28a745 !important;
+}
+.text-warning {
+    color: #ffc107 !important;
+}
+.text-info {
+    color: #17a2b8 !important;
+}
+.text-danger {
+    color: #dc3545 !important;
+}
+
+/* 添加卡片阴影动效 */
+.shadow-sm {
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.shadow-sm:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-2px);
+}
+</style>
 {% endblock %}

@@ -38,7 +38,7 @@
                 <tbody>
                     {% for report in reports %}
                     <tr>
-                        <td><a href="/report/{{ loop.index0 }}">{{ report.title }}</a></td>
+                        <td><a href="/report/{{ report.id }}">{{ report.title }}</a></td>
                         <td><a href="/industry/{{ report.industry }}">{{ report.industry }}</a></td>
                         <td>{{ report.rating }}</td>
                         <td>{{ report.org }}</td>

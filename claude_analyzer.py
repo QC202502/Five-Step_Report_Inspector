@@ -1,6 +1,6 @@
 """
-五步法分析器 - Claude版
-使用Cursor内置的Claude能力进行研报五步法分析
+五步法分析器 - DeepSeek版
+使用DeepSeek API进行研报五步法分析
 """
 
 import os
@@ -8,18 +8,19 @@ import json
 import re
 import tempfile
 import subprocess
+import requests  # 添加 requests 库用于调用 DeepSeek API
 from contextlib import contextmanager
 
-class ClaudeAnalyzer:
-    """使用Claude进行研报五步法分析的分析器"""
+class DeepSeekAnalyzer:
+    """使用DeepSeek API进行研报五步法分析的分析器"""
     
     def __init__(self):
-        """初始化Claude分析器"""
-        print("初始化Claude五步法分析器")
+        """初始化DeepSeek分析器"""
+        print("初始化DeepSeek五步法分析器")
     
     def analyze_with_five_steps(self, report_title, report_content, industry=None):
         """
-        使用Claude对研报内容进行五步法分析
+        使用DeepSeek对研报内容进行五步法分析
         
         Parameters:
         -----------
@@ -33,21 +34,25 @@ class ClaudeAnalyzer:
         Returns:
         --------
         dict
-            包含五步法分析结果的字典
+            包含五步法分析结果的字典，并包含完整的分析文本
         """
         # 构建提示词
         prompt = self._build_five_step_prompt(report_title, report_content, industry)
         
         try:
-            # 使用Claude进行分析
-            analysis_text = self._ask_claude(prompt)
+            # 使用DeepSeek进行分析
+            analysis_text = self._ask_deepseek(prompt)
             
             # 将文本分析结果转换为结构化数据
-            structured_result = self._parse_claude_analysis(analysis_text)
+            structured_result = self._parse_analysis(analysis_text)
+            
+            # 确保原始分析文本被保存
+            structured_result['full_analysis'] = analysis_text
+            
             return structured_result
             
         except Exception as e:
-            print(f"Claude分析过程中出错: {str(e)}")
+            print(f"DeepSeek分析过程中出错: {str(e)}")
             # 出错时返回简单的分析结果
             return self._generate_fallback_analysis()
     
@@ -55,9 +60,7 @@ class ClaudeAnalyzer:
         """构建五步法分析的提示词"""
         industry_context = f"该研报属于{industry}行业，" if industry else ""
         
-        # 限制内容长度，避免超出Claude的处理能力
-        if len(content) > 15000:
-            content = content[:15000] + "...(内容已截断)"
+        # 不再限制内容长度，让模型自己处理
         
         prompt = f"""
 请对以下研究报告使用黄燕铭五步分析法进行详细分析，并生成结构化评估：
@@ -114,83 +117,77 @@ class ClaudeAnalyzer:
         
         return prompt
     
-    def _ask_claude(self, prompt):
+    def _ask_deepseek(self, prompt):
         """
-        向Claude询问并获取回答
-        在Cursor环境中，我们可以直接在Python内访问Claude
+        使用 DeepSeek API 进行实时分析
         """
-        # 这里我们假设直接返回测试数据，实际环境中需要根据Cursor的API进行适配
-        # 在实际实现中，你可能需要使用Cursor提供的机制来访问Claude
-        
-        # 方法1: 如果Cursor提供了Python API来访问Claude
         try:
-            # 调用Cursor的Claude API
-            # 注意: 这里的代码需要根据Cursor的具体API进行适配
-            # 例如: return cursor_api.ask_claude(prompt)
-            
-            # 我们可以用一个简单的文件交换方式来模拟API调用
-            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as temp_file:
-                temp_file.write(prompt)
-                temp_path = temp_file.name
-            
-            # 假设我们有一个命令行工具可以调用Claude
-            # 例如: claude_cli.py --input=file.txt --output=response.txt
-            # result = subprocess.check_output(['python', 'claude_cli.py', '--input', temp_path])
-            
-            # 由于我们处于Cursor环境中，可以返回一个测试响应
-            # 在实际环境中，这里需要替换为真实的Claude调用
-            
-            # 模拟调用Claude的回应
-            return """
-## 体检清单
-| 五步要素 | 是否覆盖 | 快评 |
-| ------- | ------- | ---- |
-| 信息 | ✅ 充足 | 大量营收/利润、毛利率、基金低配度、重点公司等数据。 |
-| 逻辑 | ✅ 成链 | "24 年探底→25Q1拐点→AI算力引领复苏→投资主线"因果顺畅。 |
-| 超预期 | ⚠️ 欠量化 | 指出"低配、拐点、边际改善"，但缺与市场一致预期的具体差异。 |
-| 催化剂 | ⚠️ 不够具体 | 只有"DeepSeek 点燃""特别国债落地"等概念，无明确时间节点或可验证指标。 |
-| 结论 | ✅ 明确 | 给 9 条细分主线+风险提示，但无目标价/估值依据。 |
+            api_url = os.environ.get("DEEPSEEK_API_URL", "https://api.deepseek.com/v1/chat/completions")
+            api_key = os.environ.get("DEEPSEEK_API_KEY")
 
-## 五步框架梳理
-| 步骤 | 核心内容提炼 |
-| ---- | ------------ |
-| Information | - 24 年营收 1.27 万亿元（+5.5%），净利 234 亿元（–39%）；毛利率 25.8%。<br>- 25Q1 营收 2,893 亿元（+17%），净利 39 亿元（+215%）；研发/销售/管销费率全面下降。<br>- 基金重仓比例 3.18%，低配置。 |
-| Logic | - 24 年宏观与竞争双压 → 行业探底；<br>- 25Q1 需求回暖 + 费控 + AI 赋能 → 拐点显现；<br>- DeepSeek 催化 + 资金低配 → 估值修复空间。 |
-| Beyond-Consensus | - 观点：行业已现底部拐点、后续回补仓位。<br>**缺口**：未量化与一致预期（营收/净利/估值）的差距。 |
-| Catalyst | - DeepSeek 爆款、国产 AI 生态闭环；<br>- 超长期特别国债、地方化债推进改善现金流。<br>**缺口**：缺具体落地时间、指标（如 GPU 采购、国债发行节奏）。 |
-| Conclusion | - 维持"结构性复苏"判断；<br>- 推荐 9 组细分方向与核心标的；<br>- 风险：宏观、政策、技术、竞争、摩擦。<br>**缺口**：无目标价、盈利预测、估值框架。 |
-
-## 可操作补强思路
-| 待完善点 | 建议 |
-| ------- | ---- |
-| 量化预期差 | - 引入 Wind/彭博一致预期 25E 营收、净利，给自家预测，上修/下修幅度（%）直观呈现超预期。 |
-| 催化剂时间轴 | - 例：①6–7 月超长期国债二次发行；②Q3 DeepSeek 生态大会；③Q4 服务器 GPU 出货量季报。 |
-| 估值与目标价 | - 对算力/AI 应用龙头给 24E/25E EPS 与 PE、PEG，算出目标价和上行空间。 |
-| 场景敏感度 | - 设"云厂商 AI 投资增速 +10% / 基准 / –10%"三情景，测算板块盈利弹性。 |
-| 资金低配验证 | - 持续监测公募持仓季报、北向资金月度净买入，以图表跟踪回补节奏。 |
-
-## 一句话总结
-这份报告**信息充分、逻辑清晰**，但要完全符合"五步分析法"高标准，仍需**量化预期差、列催化剂时间表，并补充估值/目标价**；补强后说服力将显著提升。
-
-## 五步法定量评分
-| 步骤 | 分数(0-100) | 评价 |
-| ---- | ----------- | ---- |
-| 信息 | 90 | 数据全面，但缺少同行对比 |
-| 逻辑 | 85 | 因果关系清晰，论证有力 |
-| 超预期 | 60 | 识别了拐点，但缺乏量化与对比 |
-| 催化剂 | 65 | 有提及催化因素，但时间与指标模糊 |
-| 结论 | 75 | 投资建议明确，但缺乏估值支撑 |
-| 总分 | 75 | 整体良好，细节有待完善 |
-            """
+            # 如果环境变量中没有API密钥，使用硬编码的值（需要修改为您的实际API密钥）
+            if not api_key:
+                api_key = "YOUR_DEEPSEEK_API_KEY"  # 请替换为您的真实DeepSeek API Key
             
+            # 检查API密钥是否仍然是占位符
+            if api_key == "YOUR_DEEPSEEK_API_KEY":
+                print("警告: DeepSeek API Key 未配置。请设置环境变量 DEEPSEEK_API_KEY 或直接在代码中替换占位符。")
+                return (
+                    "## 体检清单\n| 五步要素 | 是否覆盖 | 快评 |\n| --- | --- | --- |\n"
+                    "| 信息 | ❌ | DeepSeek API Key未配置 |\n"
+                    "## 五步框架梳理\n| 步骤 | 核心内容提炼 |\n| --- | --- |\n"
+                    "| Information | [DeepSeek API Key未配置] |\n"
+                    "## 一句话总结\n[DeepSeek API Key未配置，无法生成总结]\n"
+                    "## 五步法定量评分\n| 步骤 | 分数(0-100) | 评价 |\n| --- | --- | --- |\n"
+                    "| 信息 | 0 | API Key未配置 |"
+                )
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            model_name = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")  # 可通过环境变量指定模型
+
+            data = {
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": "你是一个专业的投研助手，请严格按照五步法结构化分析研报。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7
+            }
+            
+            print(f"正在向 DeepSeek API 发送请求 (模型: {model_name})...")
+            
+            response = requests.post(api_url, headers=headers, json=data, timeout=120)
+            response.raise_for_status()  # 如果HTTP响应状态码不是200，引发异常
+            
+            result = response.json()
+            
+            # 解析返回内容
+            if "choices" in result and len(result["choices"]) > 0 and "message" in result["choices"][0] and "content" in result["choices"][0]["message"]:
+                analysis_text = result["choices"][0]["message"]["content"]
+                print("成功从DeepSeek API获取分析结果。")
+                return analysis_text
+            else:
+                error_message = f"DeepSeek API返回格式不符合预期: {json.dumps(result, ensure_ascii=False)}"
+                print(error_message)
+                raise ValueError(error_message)
+            
+        except requests.exceptions.Timeout:
+            print("调用 DeepSeek API 超时")
+            return self._generate_fallback_analysis().get('full_analysis', "分析失败(API超时)，请检查网络")
+        except requests.exceptions.RequestException as e:
+            print(f"调用 DeepSeek API 时发生网络错误: {str(e)}")
+            return self._generate_fallback_analysis().get('full_analysis', "分析失败(网络错误)，请检查API调用和网络连接")
         except Exception as e:
-            print(f"调用Claude时出错: {str(e)}")
-            # 如果出错，返回简单的分析结果
-            return "分析失败，请稍后重试"
+            print(f"调用 DeepSeek API 或处理响应时出错: {str(e)}")
+            return self._generate_fallback_analysis().get('full_analysis', "分析失败，请检查API调用和错误日志")
     
-    def _parse_claude_analysis(self, analysis_text):
+    def _parse_analysis(self, analysis_text):
         """
-        将Claude生成的文本分析结果解析为结构化数据
+        将DeepSeek生成的文本分析结果解析为结构化数据
         """
         try:
             # 初始化结果结构
@@ -227,8 +224,38 @@ class ClaudeAnalyzer:
                                 match = re.search(r'\|.*\|.*\|(.*)\|', line)
                                 if match:
                                     result["analysis"][step]["description"] = match.group(1).strip()
-            except:
-                pass
+            except Exception as e:
+                print(f"解析体检清单时出错: {e}")
+            
+            # 解析五步框架梳理部分
+            try:
+                framework_section_match = re.search(r'## 五步框架梳理(.*?)##', analysis_text, re.DOTALL)
+                if framework_section_match:
+                    framework_section = framework_section_match.group(1)
+                    steps_mapping = {
+                        'Information': '信息',
+                        'Logic': '逻辑',
+                        'Beyond-Consensus': '超预期',
+                        'Catalyst': '催化剂',
+                        'Conclusion': '结论'
+                    }
+                    
+                    for eng_name, cn_name in steps_mapping.items():
+                        pattern = r'\| ' + re.escape(eng_name) + r' \|(.*?)\|'
+                        match = re.search(pattern, framework_section, re.DOTALL)
+                        if match and cn_name in result["analysis"]:
+                            result["analysis"][cn_name]["framework_summary"] = match.group(1).strip()
+            except Exception as e:
+                print(f"解析五步框架梳理时出错: {e}")
+            
+            # 解析可操作补强思路部分
+            try:
+                suggestions_match = re.search(r'## 可操作补强思路(.*?)##', analysis_text, re.DOTALL)
+                if suggestions_match:
+                    improvement_suggestions = suggestions_match.group(1).strip()
+                    result["analysis"]["improvement_suggestions"] = improvement_suggestions
+            except Exception as e:
+                print(f"解析可操作补强思路时出错: {e}")
             
             # 解析五步法定量评分部分
             try:
@@ -254,9 +281,11 @@ class ClaudeAnalyzer:
                                     
                                     # 提取评价
                                     if len(parts) >= 5:
-                                        result["analysis"][step]["description"] = parts[3].strip()
-                                except:
-                                    pass
+                                        # 如果描述为空，使用评价作为描述
+                                        if not result["analysis"][step]["description"]:
+                                            result["analysis"][step]["description"] = parts[3].strip()
+                                except Exception as e:
+                                    print(f"解析步骤'{step}'评分时出错: {e}")
                 
                 # 提取总分
                 for line in scores_section.split("\n"):
@@ -283,9 +312,8 @@ class ClaudeAnalyzer:
                     result["analysis"]["summary"]["completeness_score"] = avg_score
                 
                 result["analysis"]["summary"]["steps_found"] = steps_found
-            except:
-                # 如果无法解析评分部分，使用默认值
-                pass
+            except Exception as e:
+                print(f"解析五步法定量评分时出错: {e}")
             
             # 如果没有评价，根据分数生成评价
             if not result["analysis"]["summary"]["evaluation"]:
@@ -294,15 +322,20 @@ class ClaudeAnalyzer:
             
             # 尝试提取一句话总结
             try:
-                summary_section = analysis_text.split("## 一句话总结")[1].split("##")[0].strip()
-                result["analysis"]["summary"]["one_line_summary"] = summary_section
-            except:
-                result["analysis"]["summary"]["one_line_summary"] = "无法提取总结"
+                summary_section_match = re.search(r'## 一句话总结(.*?)##', analysis_text, re.DOTALL)
+                if summary_section_match:
+                    one_line_summary = summary_section_match.group(1).strip()
+                    result["analysis"]["summary"]["one_line_summary"] = one_line_summary
+                else:
+                    result["analysis"]["summary"]["one_line_summary"] = "无法提取一句话总结"
+            except Exception as e:
+                print(f"提取一句话总结时出错: {e}")
+                result["analysis"]["summary"]["one_line_summary"] = "无法提取一句话总结"
             
             return result
             
         except Exception as e:
-            print(f"解析Claude分析结果时出错: {str(e)}")
+            print(f"解析DeepSeek分析结果时出错: {str(e)}")
             return self._generate_fallback_analysis()
     
     def _generate_fallback_analysis(self):
@@ -321,7 +354,7 @@ class ClaudeAnalyzer:
                     "one_line_summary": "分析过程中出现错误，无法获取详细分析"
                 }
             },
-            "full_analysis": "无法获取Claude分析结果"
+            "full_analysis": "无法获取DeepSeek分析结果"
         }
     
     def _get_evaluation_from_score(self, score):

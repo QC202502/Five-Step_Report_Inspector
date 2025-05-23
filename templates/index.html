@@ -3,110 +3,267 @@
 {% block title %}五步法研报检查器{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">黄燕铭五步分析法研报评估系统</h4>
-                </div>
-                <div class="card-body">
-                    <p class="lead">本系统基于黄燕铭的五步分析法对研究报告进行评估，五步分析法包括：</p>
-                    <ol>
-                        <li><strong>信息</strong> - 收集和整理相关信息，包括公司公告、行业数据、政策变化等</li>
-                        <li><strong>逻辑</strong> - 基于信息进行分析推理，形成对市场或个股的基本判断</li>
-                        <li><strong>超预期</strong> - 寻找市场共识之外的信息点，发现被低估或高估的因素</li>
-                        <li><strong>催化剂</strong> - 找出能够促使价格变动的关键事件或因素</li>
-                        <li><strong>结论</strong> - 给出明确的投资建议，包括评级、目标价等</li>
-                    </ol>
-                    <div class="alert alert-info">
-                        <strong>🚀 Claude增强分析</strong>：本系统基于Claude大语言模型的高级语义分析能力，提供详细、全面的五步法评估结果，远超简单的关键词匹配。
-                    </div>
-                    <div class="alert alert-success">
-                        已分析 <strong>{{ reports|length }}</strong> 份研报，点击"实时爬取"按钮可获取并分析最新研报。
-                    </div>
-                </div>
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-chart-line me-2"></i>黄燕铭五步分析法研报评估系统</h4>
             </div>
-        </div>
-    </div>
-
-    <!-- 搜索表单 -->
-    <div class="row mb-4">
-        <div class="col-md-8 offset-md-2">
-            <form action="/search" method="get" class="d-flex">
-                <input type="text" name="q" class="form-control" placeholder="输入关键词搜索研报...">
-                <button type="submit" class="btn btn-primary ms-2">搜索</button>
-            </form>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">研报列表</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>研报标题</th>
-                                    <th>行业</th>
-                                    <th>评级</th>
-                                    <th>机构</th>
-                                    <th>日期</th>
-                                    <th>五步法评分</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for report in reports %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>{{ report.title }}</td>
-                                    <td><a href="/industry/{{ report.industry }}">{{ report.industry }}</a></td>
-                                    <td>
-                                        {% if report.rating == '买入' or report.rating == '强烈推荐' %}
-                                            <span class="badge bg-success">{{ report.rating }}</span>
-                                        {% elif report.rating == '增持' or report.rating == '推荐' %}
-                                            <span class="badge bg-primary">{{ report.rating }}</span>
-                                        {% elif report.rating == '中性' or report.rating == '持有' %}
-                                            <span class="badge bg-secondary">{{ report.rating }}</span>
-                                        {% elif report.rating == '减持' or report.rating == '卖出' %}
-                                            <span class="badge bg-danger">{{ report.rating }}</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark">{{ report.rating }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ report.org }}</td>
-                                    <td>{{ report.date }}</td>
-                                    <td>
-                                        <div class="progress" style="height: 20px;">
-                                            {% set score = report.analysis.summary.completeness_score %}
-                                            {% if score >= 80 %}
-                                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% elif score >= 60 %}
-                                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% elif score >= 40 %}
-                                                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% else %}
-                                                <div class="progress-bar bg-danger" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <a href="/report/{{ loop.index0 }}" class="btn btn-sm btn-primary">详情</a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="lead">本系统基于黄燕铭的五步分析法对研究报告进行评估，五步分析法包括：</p>
+                        <div class="row mb-3">
+                            {% set step_icons = ["fas fa-info-circle", "fas fa-brain", "fas fa-lightbulb", "fas fa-rocket", "fas fa-flag-checkered"] %}
+                            {% set step_colors = ["primary", "success", "warning", "info", "danger"] %}
+                            {% set steps = ["信息", "逻辑", "超预期", "催化剂", "结论"] %}
+                            {% set descriptions = [
+                                "收集和整理相关信息，包括公司公告、行业数据、政策变化等",
+                                "基于信息进行分析推理，形成对市场或个股的基本判断",
+                                "寻找市场共识之外的信息点，发现被低估或高估的因素",
+                                "找出能够促使价格变动的关键事件或因素",
+                                "给出明确的投资建议，包括评级、目标价等"
+                            ] %}
+                            
+                            {% for step in range(5) %}
+                            <div class="col-md-6 mb-2">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <h5>
+                                            <i class="{{ step_icons[step] }} text-{{ step_colors[step] }} me-2"></i>
+                                            <span class="badge bg-{{ step_colors[step] }} me-1">{{ loop.index }}</span>
+                                            {{ steps[step] }}
+                                        </h5>
+                                        <p class="mb-0 small text-muted">{{ descriptions[step] }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light mb-3">
+                            <div class="card-body text-center stats-card">
+                                <span class="stats-number">{{ reports|length }}</span>
+                                <span class="stats-title">已分析研报</span>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-robot me-2"></i> <strong>Claude增强分析</strong>：本系统基于Claude大语言模型的高级语义分析能力，提供详细、全面的五步法评估结果，远超简单的关键词匹配。
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button id="scrapeNewBtn" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sync-alt me-2"></i> 爬取最新研报
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- 搜索表单 -->
+<div class="row mb-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-body">
+                <form action="/search" method="get" class="d-flex">
+                    <div class="input-group">
+                        <input type="text" name="q" class="form-control form-control-lg" placeholder="输入关键词搜索研报...">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i> 搜索
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速统计摘要 -->
+<div class="row mb-4">
+    {% set total_reports = reports|length %}
+    {% set score_excellent = reports|selectattr('analysis.summary.completeness_score', 'ge', 80)|list|length %}
+    {% set score_good = reports|selectattr('analysis.summary.completeness_score', 'ge', 60)|selectattr('analysis.summary.completeness_score', 'lt', 80)|list|length %}
+    {% set score_average = reports|selectattr('analysis.summary.completeness_score', 'ge', 40)|selectattr('analysis.summary.completeness_score', 'lt', 60)|list|length %}
+    {% set score_poor = reports|selectattr('analysis.summary.completeness_score', 'lt', 40)|list|length %}
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white stats-card">
+            <div class="card-body text-center">
+                <span class="stats-number">{{ score_excellent }}</span>
+                <span class="stats-title">优秀研报</span>
+                <div class="progress mt-2 bg-white bg-opacity-25">
+                    <div class="progress-bar bg-white" role="progressbar" style="width: {{ (score_excellent / total_reports * 100) if total_reports else 0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white stats-card">
+            <div class="card-body text-center">
+                <span class="stats-number">{{ score_good }}</span>
+                <span class="stats-title">良好研报</span>
+                <div class="progress mt-2 bg-white bg-opacity-25">
+                    <div class="progress-bar bg-white" role="progressbar" style="width: {{ (score_good / total_reports * 100) if total_reports else 0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark stats-card">
+            <div class="card-body text-center">
+                <span class="stats-number">{{ score_average }}</span>
+                <span class="stats-title">一般研报</span>
+                <div class="progress mt-2 bg-white bg-opacity-25">
+                    <div class="progress-bar bg-white" role="progressbar" style="width: {{ (score_average / total_reports * 100) if total_reports else 0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white stats-card">
+            <div class="card-body text-center">
+                <span class="stats-number">{{ score_poor }}</span>
+                <span class="stats-title">待改进研报</span>
+                <div class="progress mt-2 bg-white bg-opacity-25">
+                    <div class="progress-bar bg-white" role="progressbar" style="width: {{ (score_poor / total_reports * 100) if total_reports else 0 }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>研报列表</h5>
+                <div>
+                    <a href="/stats" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-chart-bar me-1"></i> 查看统计分析
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>研报标题</th>
+                                <th>行业</th>
+                                <th>评级</th>
+                                <th>机构</th>
+                                <th>日期</th>
+                                <th>五步法评分</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for report in reports %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ report.title }}</td>
+                                <td>
+                                    <a href="/industry/{{ report.industry }}" class="badge bg-secondary text-decoration-none">
+                                        <i class="fas fa-industry me-1"></i>{{ report.industry }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if report.rating == '买入' or report.rating == '强烈推荐' %}
+                                        <span class="badge bg-success"><i class="fas fa-arrow-up me-1"></i>{{ report.rating }}</span>
+                                    {% elif report.rating == '增持' or report.rating == '推荐' %}
+                                        <span class="badge bg-primary"><i class="fas fa-thumbs-up me-1"></i>{{ report.rating }}</span>
+                                    {% elif report.rating == '中性' or report.rating == '持有' %}
+                                        <span class="badge bg-secondary"><i class="fas fa-minus me-1"></i>{{ report.rating }}</span>
+                                    {% elif report.rating == '减持' or report.rating == '卖出' %}
+                                        <span class="badge bg-danger"><i class="fas fa-arrow-down me-1"></i>{{ report.rating }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ report.rating }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ report.org }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ report.date }}</small>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        {% set score = report.analysis.summary.completeness_score %}
+                                        {% if score >= 80 %}
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                        {% elif score >= 60 %}
+                                            <div class="progress-bar bg-info" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                        {% elif score >= 40 %}
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                        {% else %}
+                                            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ score }}%;">{{ score }}%</div>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="/report/{{ report.id }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-file-alt me-1"></i>详情
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="alert alert-info mb-0">
+                                        <i class="fas fa-info-circle me-2"></i>暂无研报数据，请点击"实时爬取"按钮获取数据。
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // 设置爬取新研报按钮事件
+    document.addEventListener('DOMContentLoaded', function() {
+        var scrapeNewBtn = document.getElementById('scrapeNewBtn');
+        if (scrapeNewBtn) {
+            scrapeNewBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                if (confirm('确定要爬取最新研报数据吗？这可能需要几分钟时间。')) {
+                    // 显示爬取进度模态框
+                    var scrapeModal = new bootstrap.Modal(document.getElementById('scrapeModal'));
+                    scrapeModal.show();
+                    
+                    // 发送爬取请求
+                    fetch('/scrape')
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert(data.message);
+                                // 刷新页面显示新数据
+                                window.location.reload();
+                            } else {
+                                alert('爬取失败: ' + data.message);
+                                scrapeModal.hide();
+                            }
+                        })
+                        .catch(error => {
+                            alert('爬取失败: ' + error);
+                            scrapeModal.hide();
+                        });
+                }
+            });
+        }
+    });
+</script>
 {% endblock %} 
