@@ -37,6 +37,7 @@ env/
 
 # 日志文件
 *.log
+logs/
 
 # 环境变量文件
 .env
@@ -51,10 +52,14 @@ env/
 
 # Mac系统文件
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Windows系统文件
-Thumbs.db
-ehthumbs.db
 Desktop.ini
 
 # Jupyter Notebook
@@ -71,6 +76,8 @@ Thumbs.db
 # 生成的研报数据
 research_reports.json
 page_source_*.html
+report_detail_*.html
+latest_analysis.json
 
 # Flask相关
 flask_session/
@@ -81,4 +88,8 @@ temp/
 
 # 缓存文件
 .cache/
-.pytest_cache/ 
+.pytest_cache/
+
+# Selenium
+chromedriver
+geckodriver 
