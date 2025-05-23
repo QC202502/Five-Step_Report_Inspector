@@ -730,97 +730,12 @@ def get_evaluation_text(score):
 
 # 添加从app.py中需要的两个函数
 
-def get_analysis_results_for_report(report_id):
-    """
-    获取指定报告的五步法分析结果
-    
-    参数:
-    report_id (int): 报告ID
-    
-    返回:
-    list: 分析结果步骤列表，每个步骤都是一个字典
-    """
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        
-        # 查询分析结果
-        analysis_rows = cursor.execute('''
-        SELECT * FROM analysis_results
-        WHERE report_id = ?
-        ORDER BY step_name
-        ''', (report_id,)).fetchall()
-        
-        steps = []
-        for ar in analysis_rows:
-            step = {
-                "step_name": ar['step_name'],
-                "found": bool(ar['found']),
-                "found_summary": "",  # 默认值
-                "missing_summary": "",  # 默认值
-                "step_score": ar['step_score'] if 'step_score' in ar else 0
-            }
-            
-            # 添加框架摘要
-            if 'framework_summary' in ar and ar['framework_summary']:
-                step["framework_summary"] = ar['framework_summary']
-            else:
-                step["framework_summary"] = "未提供框架摘要"
-            
-            # 添加改进建议
-            if 'improvement_suggestions' in ar and ar['improvement_suggestions']:
-                step["improvement_suggestions"] = ar['improvement_suggestions']
-            else:
-                step["improvement_suggestions"] = "未提供改进建议"
-            
-            # 从证据中提取实例
-            try:
-                evidence = json.loads(ar['evidence']) if ar['evidence'] else []
-                step["found_examples"] = evidence[:3]  # 最多取3个例子
-            except:
-                step["found_examples"] = []
-            
-            steps.append(step)
-        
-        return steps
-        
     except Exception as e:
         print(f"获取报告分析结果时出错: {e}")
         return []
     finally:
         conn.close()
 
-def get_full_analysis_for_report(report_id):
-    """
-    获取指定报告的完整分析文本和一句话总结
-    
-    参数:
-    report_id (int): 报告ID
-    
-    返回:
-    dict: 包含完整分析文本和一句话总结的字典
-    """
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        
-        # 查询完整分析
-        result = cursor.execute('''
-        SELECT * FROM report_full_analysis
-        WHERE report_id = ?
-        ''', (report_id,)).fetchone()
-        
-        if result:
-            return {
-                "full_analysis_text": result['full_analysis_text'] if 'full_analysis_text' in result else "",
-                "one_line_summary": result['one_line_summary'] if 'one_line_summary' in result else ""
-            }
-        else:
-            return {
-                "full_analysis_text": "",
-                "one_line_summary": ""
-            }
-            
     except Exception as e:
         print(f"获取报告完整分析时出错: {e}")
         return {
@@ -837,3 +752,76 @@ if __name__ == "__main__":
     # 如果存在JSON文件，导入到数据库
     if os.path.exists('research_reports.json'):
         import_from_json() 
+# 适配器函数，使用新表结构替代旧表
+    # 将新格式转换为旧格式
+    result = {}
+    for step_name, step_data in analysis['steps'].items():
+        result[step_name] = {
+            'found': step_data['found'],
+            'description': step_data['description'],
+            'step_score': step_data['step_score'],
+            'keywords': [],  # 旧格式需要这些字段，但新格式可能没有
+            'evidence': [],
+            'framework_summary': step_data.get('framework_summary', '')
+        }
+    
+    return result
+
+    # 将新格式转换为旧格式
+    return {
+        'full_analysis_text': analysis['full_analysis'],
+        'one_line_summary': analysis['one_line_summary']
+    }
+
+# 适配器函数，使用新表结构替代旧表
+def get_analysis_results_for_report(report_id):
+    """
+    获取研报的五步法分析结果（适配旧接口）
+    
+    参数:
+    report_id (int): 研报ID
+    
+    返回:
+    dict: 分析结果字典
+    """
+    from analysis_db import AnalysisDatabase
+    db = AnalysisDatabase()
+    analysis = db.get_analysis_by_report_id(report_id)
+    if not analysis:
+        return {}
+    
+    # 将新格式转换为旧格式
+    result = {}
+    for step_name, step_data in analysis['steps'].items():
+        result[step_name] = {
+            'found': step_data['found'],
+            'description': step_data['description'],
+            'step_score': step_data['step_score'],
+            'keywords': [],  # 旧格式需要这些字段，但新格式可能没有
+            'evidence': [],
+            'framework_summary': step_data.get('framework_summary', '')
+        }
+    
+    return result
+
+def get_full_analysis_for_report(report_id):
+    """
+    获取研报的完整分析文本（适配旧接口）
+    
+    参数:
+    report_id (int): 研报ID
+    
+    返回:
+    dict: 包含完整分析文本和一句话总结的字典
+    """
+    from analysis_db import AnalysisDatabase
+    db = AnalysisDatabase()
+    analysis = db.get_analysis_by_report_id(report_id)
+    if not analysis:
+        return None
+    
+    # 将新格式转换为旧格式
+    return {
+        'full_analysis_text': analysis['full_analysis'],
+        'one_line_summary': analysis['one_line_summary']
+    }

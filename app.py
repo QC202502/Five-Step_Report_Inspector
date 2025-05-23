@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # 版本常量
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 
 # 数据库路径
 DATABASE_PATH = 'research_reports.db'
