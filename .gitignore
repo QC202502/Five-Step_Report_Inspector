@@ -1,35 +1,72 @@
-# Python字节码文件
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# 虚拟环境
-venv/
+*.so
+.Python
 env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
 ENV/
+env/
 
-# 数据库文件
-*.db
-*.sqlite3
-*.sqlite
-
-# 日志文件
-*.log
-
-# 本地配置
-instance/
-.env
-.env.*
-
-# 系统文件
-.DS_Store
-Thumbs.db
-
-# 编辑器和IDE文件
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# Database
+*.sqlite3
+*.db-journal
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# API Keys and Secrets
+api_keys.py
+secrets.py
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 本地配置
+instance/
+.env.*.local
+
+# 系统文件
+.DS_Store
+Thumbs.db
 
 # 生成的研报数据
 research_reports.json
