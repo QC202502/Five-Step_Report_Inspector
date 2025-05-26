@@ -3,8 +3,108 @@
 {% block title %}研报分析 - {{ report.title }}{% endblock %}
 
 {% block extra_head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 <style>
+    /* 基础响应式布局样式 */
+    .container-fluid {
+        width: 100%;
+        padding: 0 15px;
+        margin: 0 auto;
+    }
+    
+    /* 小屏幕设备 (手机, 768px 以下) */
+    @media (max-width: 767.98px) {
+        .container-fluid {
+            max-width: 100%;
+            padding: 0 10px;
+        }
+    }
+    
+    /* 中等屏幕设备 (平板, 768px 到 991.98px) */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+        .container-fluid {
+            max-width: 95%;
+        }
+    }
+    
+    /* 大屏幕设备 (桌面, 992px 到 1199.98px) */
+    @media (min-width: 992px) and (max-width: 1199.98px) {
+        .container-fluid {
+            max-width: 90%;
+        }
+    }
+    
+    /* 超大屏幕设备 (大桌面, 1200px 以上) */
+    @media (min-width: 1200px) {
+        .container-fluid {
+            max-width: 1800px;
+        }
+    }
+    
+    /* 侧边栏样式 */
+    .sidebar-left, .sidebar-right {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+    
+    .sidebar-content {
+        position: sticky;
+        top: 20px;
+    }
+    
+    /* 小屏幕上的侧边栏样式 */
+    @media (max-width: 991.98px) {
+        .sidebar-left, .sidebar-right {
+            position: fixed;
+            top: 0;
+            height: 100%;
+            background-color: white;
+            z-index: 1050;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            padding: 20px;
+        }
+        
+        .sidebar-left {
+            left: 0;
+            transform: translateX(-100%);
+            width: 280px;
+        }
+        
+        .sidebar-right {
+            right: 0;
+            transform: translateX(100%);
+            width: 280px;
+        }
+        
+        .sidebar-left.show {
+            transform: translateX(0);
+        }
+        
+        .sidebar-right.show {
+            transform: translateX(0);
+        }
+    }
+    
+    /* 侧边栏背景遮罩 */
+    .sidebar-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        z-index: 1040;
+        display: none;
+    }
+    
+    .sidebar-backdrop.show {
+        display: block;
+    }
+    
     /* 修复页面无限延长bug的内联样式 */
     .container {
         max-width: 1200px;
@@ -46,11 +146,107 @@
     .progress-bar-danger {
         background-color: #dc3545;
     }
+    
+    /* 响应式字体和间距 */
+    @media (max-width: 767.98px) {
+        body {
+            font-size: 14px;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            margin-bottom: 1rem;
+        }
+        
+        .card-body {
+            padding: 0.75rem;
+        }
+        
+        .report-content p {
+            margin-bottom: 1em;
+        }
+    }
+    
+    /* 中等屏幕上的调整 */
+    @media (min-width: 768px) and (max-width: 991.98px) {
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .report-content p {
+            margin-bottom: 1.2em;
+        }
+    }
+    
+    /* 响应式表格 */
+    .table-responsive-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .table-scroll-hint {
+        display: none;
+        text-align: center;
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    @media (max-width: 767.98px) {
+        .table-scroll-hint {
+            display: block;
+        }
+    }
+    
+    /* 在小屏幕上调整元素顺序 */
+    @media (max-width: 767.98px) {
+        .mobile-order-1 {
+            order: 1;
+        }
+        .mobile-order-2 {
+            order: 2;
+        }
+        .mobile-order-3 {
+            order: 3;
+        }
+    }
+    
+    /* 图表容器高度 */
+    @media (max-width: 767.98px) {
+        .chart-container {
+            height: 200px;
+        }
+    }
+    
+    @media (min-width: 768px) {
+        .chart-container {
+            height: 300px;
+        }
+    }
+    
+    /* 关闭按钮 */
+    .sidebar-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="sidebar-backdrop"></div>
+<div class="container-fluid mt-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/">首页</a></li>
@@ -58,253 +254,312 @@
         </ol>
     </nav>
 
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">{{ report.title }}</h4>
-            <span class="badge bg-light text-dark">{{ report.industry }}</span>
+    <!-- 小屏幕上的侧边栏切换按钮 -->
+    <div class="d-lg-none mb-3">
+        <div class="d-flex justify-content-between">
+            <button class="btn btn-sm btn-outline-primary" id="toggleLeftSidebar">
+                <i class="fas fa-list"></i> 目录导航
+            </button>
+            <button class="btn btn-sm btn-outline-primary" id="toggleRightSidebar">
+                <i class="fas fa-chart-pie"></i> 分析结果
+            </button>
         </div>
-        <div class="card-body">
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <p><strong>机构：</strong> {{ report.org }}</p>
-                    <p><strong>日期：</strong> {{ report.date }}</p>
+    </div>
+
+    <div class="row">
+        <!-- 左侧边栏 -->
+        <div class="col-lg-3 sidebar-left d-none d-lg-block">
+            <div class="sidebar-content" id="leftSidebar">
+                <div class="d-lg-none">
+                    <span class="sidebar-close" id="closeLeftSidebar">&times;</span>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>评级：</strong> {{ report.rating }}</p>
-                    <p><strong>股票：</strong> {{ report.stock_name }} ({{ report.stock_code }})</p>
-                </div>
-            </div>
-            
-            <div class="mb-4">
-                <h5>摘要</h5>
-                <p>{{ report.abstract }}</p>
-            </div>
-            
-            <!-- 分析器选择 -->
-            <div class="mb-4">
-                <h5>分析结果</h5>
-                <ul class="nav nav-tabs" id="analyzerTabs" role="tablist">
-                    {% if claude_analysis %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="claude-tab" data-bs-toggle="tab" data-bs-target="#claude" type="button" role="tab" aria-controls="claude" aria-selected="true">Claude分析</button>
-                    </li>
-                    {% endif %}
-                    
-                    {% if deepseek_analysis %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if not claude_analysis %}active{% endif %}" id="deepseek-tab" data-bs-toggle="tab" data-bs-target="#deepseek" type="button" role="tab" aria-controls="deepseek" aria-selected="{% if not claude_analysis %}true{% else %}false{% endif %}">DeepSeek分析</button>
-                    </li>
-                    {% endif %}
-                    
-                    {% if not claude_analysis and not deepseek_analysis %}
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="no-analysis-tab" data-bs-toggle="tab" data-bs-target="#no-analysis" type="button" role="tab" aria-controls="no-analysis" aria-selected="true">暂无分析</button>
-                    </li>
-                    {% endif %}
-                </ul>
                 
-                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="analyzerTabsContent">
-                    {% if claude_analysis %}
-                    <div class="tab-pane fade show active" id="claude" role="tabpanel" aria-labelledby="claude-tab">
-                        <!-- Claude分析结果 -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-info text-white">
-                                        <h5 class="mb-0">总体评价</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6>完整度评分</h6>
-                                            <span class="badge bg-primary">{{ claude_analysis.completeness_score }}</span>
-                                        </div>
-                                        <p>{{ claude_analysis.evaluation }}</p>
-                                        <p class="fw-bold">一句话总结：</p>
-                                        <p>{{ claude_analysis.one_line_summary }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="mb-0">五步法雷达图</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <canvas id="claudeRadarChart" width="400" height="300"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 各步骤详细分析 -->
-                        <div class="accordion" id="claudeStepsAccordion">
-                            {% for step_name, step_data in claude_analysis.steps.items() %}
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="claude-heading-{{ loop.index }}">
-                                    <button class="accordion-button" type="button" data-bs-target="#claude-collapse-{{ loop.index }}" aria-expanded="true" aria-controls="claude-collapse-{{ loop.index }}">
-                                        {{ step_name }} - 评分: {{ step_data.step_score }}
-                                    </button>
-                                </h2>
-                                <div id="claude-collapse-{{ loop.index }}" class="accordion-collapse collapse show" aria-labelledby="claude-heading-{{ loop.index }}">
-                                    <div class="accordion-body">
-                                        <p><strong>描述：</strong> {{ step_data.description | safe }}</p>
-                                        {% if step_data.framework_summary %}
-                                        <p><strong>框架梳理：</strong> {{ step_data.framework_summary | safe }}</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        
-                        <!-- 改进建议 -->
-                        {% if claude_analysis.improvement_suggestions %}
-                        <div class="card mt-3">
-                            <div class="card-header bg-warning">
-                                <h5 class="mb-0">改进建议</h5>
-                            </div>
-                            <div class="card-body">
-                                <ul class="list-group">
-                                    {% for suggestion in claude_analysis.improvement_suggestions %}
-                                        {% if suggestion.point and suggestion.suggestion and suggestion.point != '-------' and suggestion.suggestion != '----' %}
-                                        <li class="list-group-item">
-                                            <strong>{{ suggestion.point }}：</strong> {{ suggestion.suggestion | safe }}
-                                        </li>
-                                        {% endif %}
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        </div>
-                        {% endif %}
+                <!-- 研报基本信息 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">研报信息</h5>
                     </div>
-                    {% endif %}
-                    
-                    {% if deepseek_analysis %}
-                    <div class="tab-pane fade {% if not claude_analysis %}show active{% endif %}" id="deepseek" role="tabpanel" aria-labelledby="deepseek-tab">
-                        <!-- DeepSeek分析结果 -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-primary text-white">
-                                        <h5 class="mb-0">总体评价</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6>完整度评分</h6>
-                                            <span class="badge bg-primary">{{ deepseek_analysis.completeness_score }}</span>
-                                        </div>
-                                        <p>{{ deepseek_analysis.evaluation }}</p>
-                                        <p class="fw-bold">一句话总结：</p>
-                                        <p>{{ deepseek_analysis.one_line_summary }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card mb-3">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="mb-0">五步法雷达图</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <canvas id="deepseekRadarChart" width="400" height="300"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- 各步骤详细分析 -->
-                        <div class="accordion" id="deepseekStepsAccordion">
-                            {% for step_name, step_data in deepseek_analysis.steps.items() %}
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="deepseek-heading-{{ loop.index }}">
-                                    <button class="accordion-button" type="button" data-bs-target="#deepseek-collapse-{{ loop.index }}" aria-expanded="true" aria-controls="deepseek-collapse-{{ loop.index }}">
-                                        {{ step_name }} - 评分: {{ step_data.step_score }}
-                                    </button>
-                                </h2>
-                                <div id="deepseek-collapse-{{ loop.index }}" class="accordion-collapse collapse show" aria-labelledby="deepseek-heading-{{ loop.index }}">
-                                    <div class="accordion-body">
-                                        <p><strong>描述：</strong> {{ step_data.description | safe }}</p>
-                                        {% if step_data.framework_summary %}
-                                        <p><strong>框架梳理：</strong> {{ step_data.framework_summary | safe }}</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        
-                        <!-- 改进建议 -->
-                        {% if deepseek_analysis.improvement_suggestions %}
-                        <div class="card mt-3">
-                            <div class="card-header bg-warning">
-                                <h5 class="mb-0">改进建议</h5>
-                            </div>
-                            <div class="card-body">
-                                <ul class="list-group">
-                                    {% for suggestion in deepseek_analysis.improvement_suggestions %}
-                                        {% if suggestion.point and suggestion.suggestion and suggestion.point != '-------' and suggestion.suggestion != '----' %}
-                                        <li class="list-group-item">
-                                            <strong>{{ suggestion.point }}：</strong> {{ suggestion.suggestion | safe }}
-                                        </li>
-                                        {% endif %}
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        </div>
-                        {% endif %}
+                    <div class="card-body">
+                        <h6>{{ report.title }}</h6>
+                        <p class="mb-1"><strong>机构：</strong> {{ report.org }}</p>
+                        <p class="mb-1"><strong>日期：</strong> {{ report.date }}</p>
+                        <p class="mb-1"><strong>评级：</strong> {{ report.rating }}</p>
+                        <p class="mb-1"><strong>股票：</strong> {{ report.stock_name }} ({{ report.stock_code }})</p>
                     </div>
-                    {% endif %}
-                    
-                    {% if not claude_analysis and not deepseek_analysis %}
-                    <div class="tab-pane fade show active" id="no-analysis" role="tabpanel" aria-labelledby="no-analysis-tab">
-                        <div class="alert alert-info">
-                            <p>该研报尚未进行五步法分析，请点击下方按钮进行分析。</p>
-                            <div class="d-flex gap-2">
-                                <a href="/analyze/{{ report.id }}?analyzer=claude" class="btn btn-primary">使用Claude分析</a>
-                                <a href="/analyze/{{ report.id }}?analyzer=deepseek" class="btn btn-success">使用DeepSeek分析</a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
                 </div>
-            </div>
-            
-            <div class="mb-4">
-                <h5>研报内容</h5>
-                <div class="report-controls mb-2">
-                    <div class="d-flex justify-content-between mb-2">
-                        <div class="font-size-controls">
-                            <button class="btn btn-sm btn-outline-secondary" id="decreaseFontBtn"><i class="fas fa-minus"></i> 缩小字体</button>
-                            <button class="btn btn-sm btn-outline-secondary" id="increaseFontBtn"><i class="fas fa-plus"></i> 放大字体</button>
-                            <button class="btn btn-sm btn-outline-secondary" id="resetFontBtn"><i class="fas fa-sync"></i> 重置</button>
+                
+                <!-- 目录导航 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">目录导航</h5>
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="toc" class="list-group list-group-flush"></div>
+                    </div>
+                </div>
+                
+                <!-- 阅读控制 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">阅读控制</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label">字体大小</label>
+                            <div class="btn-group w-100">
+                                <button class="btn btn-sm btn-outline-secondary" id="decreaseFontBtn"><i class="fas fa-minus"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" id="resetFontBtn"><i class="fas fa-sync"></i></button>
+                                <button class="btn btn-sm btn-outline-secondary" id="increaseFontBtn"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <button class="btn btn-sm btn-outline-success w-100" id="toggleReadingModeBtn">
+                                <i class="fas fa-book-reader"></i> 阅读模式
+                            </button>
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-outline-success" id="toggleReadingModeBtn"><i class="fas fa-book-reader"></i> 阅读模式</button>
-                            <button class="btn btn-sm btn-outline-primary" id="printReportBtn"><i class="fas fa-print"></i> 打印研报</button>
+                            <button class="btn btn-sm btn-outline-primary w-100" id="printReportBtn">
+                                <i class="fas fa-print"></i> 打印研报
+                            </button>
                         </div>
                     </div>
-                    <div class="row mb-2" id="tocContainer" style="display: none;">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-header bg-light">
-                                    <h6 class="mb-0">目录</h6>
-                                </div>
-                                <div class="card-body p-2">
-                                    <div id="toc" class="list-group list-group-flush"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="report-content border p-3 rounded" style="max-height: 600px; overflow-y: auto; white-space: pre-wrap; font-family: 'Noto Sans SC', sans-serif; font-size: 16px; line-height: 2.2; background-color: #f8f9fa; border: 1px solid #dee2e6 !important; text-indent: 2em; padding: 2rem !important; letter-spacing: 0.02em;">
-                    {{ report.full_content | safe }}
                 </div>
             </div>
         </div>
-        <div class="card-footer">
-            <a href="/" class="btn btn-secondary">返回列表</a>
-            {% if report.link %}
-            <a href="{{ report.link }}" target="_blank" class="btn btn-primary">查看原文</a>
-            {% endif %}
+        
+        <!-- 中间内容区 -->
+        <div class="col-lg-6 col-md-8 col-sm-12 content-main">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{{ report.title }}</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>摘要</h5>
+                        <p>{{ report.abstract }}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>研报内容</h5>
+                        <div class="report-content border p-3 rounded" style="max-height: none; overflow-y: auto; white-space: pre-wrap; font-family: 'Noto Sans SC', sans-serif; font-size: 16px; line-height: 2.2; background-color: #f8f9fa; border: 1px solid #dee2e6 !important; text-indent: 2em; padding: 2rem !important; letter-spacing: 0.02em;">
+                            {{ report.full_content | safe }}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="/" class="btn btn-secondary">返回列表</a>
+                    {% if report.link %}
+                    <a href="{{ report.link }}" target="_blank" class="btn btn-primary">查看原文</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧边栏 -->
+        <div class="col-lg-3 col-md-4 sidebar-right d-none d-lg-block">
+            <div class="sidebar-content" id="rightSidebar">
+                <div class="d-lg-none">
+                    <span class="sidebar-close" id="closeRightSidebar">&times;</span>
+                </div>
+                
+                <!-- 分析器选择 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">分析结果</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="nav nav-tabs" id="analyzerTabs" role="tablist">
+                            {% if claude_analysis %}
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="claude-tab" data-bs-toggle="tab" data-bs-target="#claude" type="button" role="tab" aria-controls="claude" aria-selected="true">Claude</button>
+                            </li>
+                            {% endif %}
+                            
+                            {% if deepseek_analysis %}
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link {% if not claude_analysis %}active{% endif %}" id="deepseek-tab" data-bs-toggle="tab" data-bs-target="#deepseek" type="button" role="tab" aria-controls="deepseek" aria-selected="{% if not claude_analysis %}true{% else %}false{% endif %}">DeepSeek</button>
+                            </li>
+                            {% endif %}
+                            
+                            {% if not claude_analysis and not deepseek_analysis %}
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="no-analysis-tab" data-bs-toggle="tab" data-bs-target="#no-analysis" type="button" role="tab" aria-controls="no-analysis" aria-selected="true">暂无分析</button>
+                            </li>
+                            {% endif %}
+                        </ul>
+                        
+                        <div class="tab-content p-3" id="analyzerTabsContent">
+                            {% if claude_analysis %}
+                            <div class="tab-pane fade show active" id="claude" role="tabpanel" aria-labelledby="claude-tab">
+                                <!-- Claude分析结果摘要 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">总体评价</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span>完整度评分</span>
+                                            <span class="badge bg-primary">{{ claude_analysis.completeness_score }}</span>
+                                        </div>
+                                        <p class="small">{{ claude_analysis.one_line_summary }}</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 雷达图 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">五步法雷达图</h6>
+                                    </div>
+                                    <div class="card-body chart-container">
+                                        <canvas id="claudeRadarChart"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- 改进建议 -->
+                                {% if claude_analysis.improvement_suggestions %}
+                                <div class="card mb-3">
+                                    <div class="card-header bg-warning">
+                                        <h6 class="mb-0">改进建议</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="list-group list-group-flush">
+                                            {% for suggestion in claude_analysis.improvement_suggestions %}
+                                                {% if suggestion.point and suggestion.suggestion and suggestion.point != '-------' and suggestion.suggestion != '----' %}
+                                                <div class="list-group-item p-2">
+                                                    <div class="fw-bold small">{{ suggestion.point }}</div>
+                                                    <div class="small">{{ suggestion.suggestion | safe }}</div>
+                                                </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- 查看详细分析按钮 -->
+                                <button class="btn btn-outline-primary btn-sm w-100" id="showClaudeDetails">
+                                    查看详细分析 <i class="fas fa-chevron-down"></i>
+                                </button>
+                                
+                                <!-- 详细分析 (默认隐藏) -->
+                                <div class="mt-3 d-none" id="claudeDetailsContainer">
+                                    <!-- 各步骤详细分析 -->
+                                    <div class="accordion" id="claudeStepsAccordion">
+                                        {% for step_name, step_data in claude_analysis.steps.items() %}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="claude-heading-{{ loop.index }}">
+                                                <button class="accordion-button" type="button" data-bs-target="#claude-collapse-{{ loop.index }}" aria-expanded="true" aria-controls="claude-collapse-{{ loop.index }}">
+                                                    {{ step_name }} - 评分: {{ step_data.step_score }}
+                                                </button>
+                                            </h2>
+                                            <div id="claude-collapse-{{ loop.index }}" class="accordion-collapse collapse show" aria-labelledby="claude-heading-{{ loop.index }}">
+                                                <div class="accordion-body">
+                                                    <p><strong>描述：</strong> {{ step_data.description | safe }}</p>
+                                                    {% if step_data.framework_summary %}
+                                                    <p><strong>框架梳理：</strong> {{ step_data.framework_summary | safe }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if deepseek_analysis %}
+                            <div class="tab-pane fade {% if not claude_analysis %}show active{% endif %}" id="deepseek" role="tabpanel" aria-labelledby="deepseek-tab">
+                                <!-- DeepSeek分析结果摘要 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0">总体评价</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span>完整度评分</span>
+                                            <span class="badge bg-primary">{{ deepseek_analysis.completeness_score }}</span>
+                                        </div>
+                                        <p class="small">{{ deepseek_analysis.one_line_summary }}</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 雷达图 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">五步法雷达图</h6>
+                                    </div>
+                                    <div class="card-body chart-container">
+                                        <canvas id="deepseekRadarChart"></canvas>
+                                    </div>
+                                </div>
+                                
+                                <!-- 改进建议 -->
+                                {% if deepseek_analysis.improvement_suggestions %}
+                                <div class="card mb-3">
+                                    <div class="card-header bg-warning">
+                                        <h6 class="mb-0">改进建议</h6>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="list-group list-group-flush">
+                                            {% for suggestion in deepseek_analysis.improvement_suggestions %}
+                                                {% if suggestion.point and suggestion.suggestion and suggestion.point != '-------' and suggestion.suggestion != '----' %}
+                                                <div class="list-group-item p-2">
+                                                    <div class="fw-bold small">{{ suggestion.point }}</div>
+                                                    <div class="small">{{ suggestion.suggestion | safe }}</div>
+                                                </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- 查看详细分析按钮 -->
+                                <button class="btn btn-outline-primary btn-sm w-100" id="showDeepseekDetails">
+                                    查看详细分析 <i class="fas fa-chevron-down"></i>
+                                </button>
+                                
+                                <!-- 详细分析 (默认隐藏) -->
+                                <div class="mt-3 d-none" id="deepseekDetailsContainer">
+                                    <!-- 各步骤详细分析 -->
+                                    <div class="accordion" id="deepseekStepsAccordion">
+                                        {% for step_name, step_data in deepseek_analysis.steps.items() %}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="deepseek-heading-{{ loop.index }}">
+                                                <button class="accordion-button" type="button" data-bs-target="#deepseek-collapse-{{ loop.index }}" aria-expanded="true" aria-controls="deepseek-collapse-{{ loop.index }}">
+                                                    {{ step_name }} - 评分: {{ step_data.step_score }}
+                                                </button>
+                                            </h2>
+                                            <div id="deepseek-collapse-{{ loop.index }}" class="accordion-collapse collapse show" aria-labelledby="deepseek-heading-{{ loop.index }}">
+                                                <div class="accordion-body">
+                                                    <p><strong>描述：</strong> {{ step_data.description | safe }}</p>
+                                                    {% if step_data.framework_summary %}
+                                                    <p><strong>框架梳理：</strong> {{ step_data.framework_summary | safe }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if not claude_analysis and not deepseek_analysis %}
+                            <div class="tab-pane fade show active" id="no-analysis" role="tabpanel" aria-labelledby="no-analysis-tab">
+                                <div class="alert alert-info">
+                                    <p>该研报尚未进行五步法分析，请点击下方按钮进行分析。</p>
+                                    <div class="d-grid gap-2">
+                                        <a href="/analyze/{{ report.id }}?analyzer=claude" class="btn btn-primary btn-sm">使用Claude分析</a>
+                                        <a href="/analyze/{{ report.id }}?analyzer=deepseek" class="btn btn-success btn-sm">使用DeepSeek分析</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -314,6 +569,89 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // 侧边栏控制
+    const leftSidebar = document.querySelector('.sidebar-left');
+    const rightSidebar = document.querySelector('.sidebar-right');
+    const toggleLeftBtn = document.getElementById('toggleLeftSidebar');
+    const toggleRightBtn = document.getElementById('toggleRightSidebar');
+    const closeLeftBtn = document.getElementById('closeLeftSidebar');
+    const closeRightBtn = document.getElementById('closeRightSidebar');
+    const backdrop = document.querySelector('.sidebar-backdrop');
+    
+    // 显示左侧边栏
+    if (toggleLeftBtn) {
+        toggleLeftBtn.addEventListener('click', function() {
+            leftSidebar.classList.add('show');
+            backdrop.classList.add('show');
+            // 确保右侧边栏关闭
+            rightSidebar.classList.remove('show');
+        });
+    }
+    
+    // 显示右侧边栏
+    if (toggleRightBtn) {
+        toggleRightBtn.addEventListener('click', function() {
+            rightSidebar.classList.add('show');
+            backdrop.classList.add('show');
+            // 确保左侧边栏关闭
+            leftSidebar.classList.remove('show');
+        });
+    }
+    
+    // 关闭左侧边栏
+    if (closeLeftBtn) {
+        closeLeftBtn.addEventListener('click', function() {
+            leftSidebar.classList.remove('show');
+            backdrop.classList.remove('show');
+        });
+    }
+    
+    // 关闭右侧边栏
+    if (closeRightBtn) {
+        closeRightBtn.addEventListener('click', function() {
+            rightSidebar.classList.remove('show');
+            backdrop.classList.remove('show');
+        });
+    }
+    
+    // 点击背景关闭侧边栏
+    if (backdrop) {
+        backdrop.addEventListener('click', function() {
+            leftSidebar.classList.remove('show');
+            rightSidebar.classList.remove('show');
+            backdrop.classList.remove('show');
+        });
+    }
+    
+    // 详细分析切换
+    const showClaudeDetailsBtn = document.getElementById('showClaudeDetails');
+    const claudeDetailsContainer = document.getElementById('claudeDetailsContainer');
+    const showDeepseekDetailsBtn = document.getElementById('showDeepseekDetails');
+    const deepseekDetailsContainer = document.getElementById('deepseekDetailsContainer');
+    
+    if (showClaudeDetailsBtn && claudeDetailsContainer) {
+        showClaudeDetailsBtn.addEventListener('click', function() {
+            claudeDetailsContainer.classList.toggle('d-none');
+            const icon = this.querySelector('i');
+            if (claudeDetailsContainer.classList.contains('d-none')) {
+                this.innerHTML = '查看详细分析 <i class="fas fa-chevron-down"></i>';
+            } else {
+                this.innerHTML = '隐藏详细分析 <i class="fas fa-chevron-up"></i>';
+            }
+        });
+    }
+    
+    if (showDeepseekDetailsBtn && deepseekDetailsContainer) {
+        showDeepseekDetailsBtn.addEventListener('click', function() {
+            deepseekDetailsContainer.classList.toggle('d-none');
+            if (deepseekDetailsContainer.classList.contains('d-none')) {
+                this.innerHTML = '查看详细分析 <i class="fas fa-chevron-down"></i>';
+            } else {
+                this.innerHTML = '隐藏详细分析 <i class="fas fa-chevron-up"></i>';
+            }
+        });
+    }
+    
     // 字体大小调整和打印功能
     const reportContent = document.querySelector('.report-content');
     const decreaseFontBtn = document.getElementById('decreaseFontBtn');
@@ -321,7 +659,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetFontBtn = document.getElementById('resetFontBtn');
     const printReportBtn = document.getElementById('printReportBtn');
     const toggleReadingModeBtn = document.getElementById('toggleReadingModeBtn');
-    const tocContainer = document.getElementById('tocContainer');
     const toc = document.getElementById('toc');
     
     // 处理手风琴组件，使其可以独立展开和收起
@@ -359,56 +696,62 @@ document.addEventListener('DOMContentLoaded', function() {
     let readingModeActive = false;
     
     // 减小字体
-    decreaseFontBtn.addEventListener('click', function() {
-        if (currentFontSize > 12) {
-            currentFontSize -= 1;
-            reportContent.style.fontSize = currentFontSize + 'px';
-        }
-    });
+    if (decreaseFontBtn && reportContent) {
+        decreaseFontBtn.addEventListener('click', function() {
+            if (currentFontSize > 12) {
+                currentFontSize -= 1;
+                reportContent.style.fontSize = currentFontSize + 'px';
+            }
+        });
+    }
     
     // 增大字体
-    increaseFontBtn.addEventListener('click', function() {
-        if (currentFontSize < 24) {
-            currentFontSize += 1;
-            reportContent.style.fontSize = currentFontSize + 'px';
-        }
-    });
+    if (increaseFontBtn && reportContent) {
+        increaseFontBtn.addEventListener('click', function() {
+            if (currentFontSize < 24) {
+                currentFontSize += 1;
+                reportContent.style.fontSize = currentFontSize + 'px';
+            }
+        });
+    }
     
     // 重置字体
-    resetFontBtn.addEventListener('click', function() {
-        currentFontSize = 16;
-        reportContent.style.fontSize = currentFontSize + 'px';
-    });
+    if (resetFontBtn && reportContent) {
+        resetFontBtn.addEventListener('click', function() {
+            currentFontSize = 16;
+            reportContent.style.fontSize = currentFontSize + 'px';
+        });
+    }
     
     // 阅读模式切换
-    toggleReadingModeBtn.addEventListener('click', function() {
-        readingModeActive = !readingModeActive;
-        
-        if (readingModeActive) {
-            // 激活阅读模式
-            reportContent.classList.add('reading-mode');
-            toggleReadingModeBtn.classList.remove('btn-outline-success');
-            toggleReadingModeBtn.classList.add('btn-success');
-            toggleReadingModeBtn.innerHTML = '<i class="fas fa-times"></i> 退出阅读模式';
+    if (toggleReadingModeBtn && reportContent) {
+        toggleReadingModeBtn.addEventListener('click', function() {
+            readingModeActive = !readingModeActive;
             
-            // 生成目录
-            generateTOC();
-            tocContainer.style.display = 'block';
-        } else {
-            // 退出阅读模式
-            reportContent.classList.remove('reading-mode');
-            toggleReadingModeBtn.classList.remove('btn-success');
-            toggleReadingModeBtn.classList.add('btn-outline-success');
-            toggleReadingModeBtn.innerHTML = '<i class="fas fa-book-reader"></i> 阅读模式';
-            
-            // 隐藏目录
-            tocContainer.style.display = 'none';
-        }
-    });
+            if (readingModeActive) {
+                // 激活阅读模式
+                reportContent.classList.add('reading-mode');
+                toggleReadingModeBtn.classList.remove('btn-outline-success');
+                toggleReadingModeBtn.classList.add('btn-success');
+                toggleReadingModeBtn.innerHTML = '<i class="fas fa-times"></i> 退出阅读模式';
+                
+                // 生成目录
+                generateTOC();
+            } else {
+                // 退出阅读模式
+                reportContent.classList.remove('reading-mode');
+                toggleReadingModeBtn.classList.remove('btn-success');
+                toggleReadingModeBtn.classList.add('btn-outline-success');
+                toggleReadingModeBtn.innerHTML = '<i class="fas fa-book-reader"></i> 阅读模式';
+            }
+        });
+    }
     
     // 生成目录函数
     function generateTOC() {
         // 清空目录
+        if (!toc) return;
+        
         toc.innerHTML = '';
         
         // 获取研报内容
@@ -471,35 +814,60 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 打印功能
-    printReportBtn.addEventListener('click', function() {
-        const reportTitle = document.querySelector('.card-header h4').textContent;
-        const printWindow = window.open('', '_blank');
-        
-        printWindow.document.write(`
-            <html>
-            <head>
-                <title>${reportTitle}</title>
-                <style>
-                    body { font-family: 'Noto Sans SC', sans-serif; line-height: 2; padding: 20px; }
-                    h1 { text-align: center; margin-bottom: 30px; }
-                    .report-content { white-space: pre-wrap; text-indent: 2em; }
-                    .report-content p { margin-bottom: 1.5em; }
-                    .report-content br + br { display: block; margin-top: 1em; }
-                </style>
-            </head>
-            <body>
-                <h1>${reportTitle}</h1>
-                <div class="report-content">${reportContent.innerHTML}</div>
-            </body>
-            </html>
-        `);
-        
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-            printWindow.print();
-        }, 500);
-    });
+    if (printReportBtn && reportContent) {
+        printReportBtn.addEventListener('click', function() {
+            const reportTitle = document.querySelector('.card-header h4').textContent;
+            const printWindow = window.open('', '_blank');
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>${reportTitle}</title>
+                    <style>
+                        body { font-family: 'Noto Sans SC', sans-serif; line-height: 2; padding: 20px; }
+                        h1 { text-align: center; margin-bottom: 30px; }
+                        .report-content { white-space: pre-wrap; text-indent: 2em; }
+                        .report-content p { margin-bottom: 1.5em; }
+                        .report-content br + br { display: block; margin-top: 1em; }
+                    </style>
+                </head>
+                <body>
+                    <h1>${reportTitle}</h1>
+                    <div class="report-content">${reportContent.innerHTML}</div>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        });
+    }
+    
+    // 响应式表格处理
+    function makeTablesResponsive() {
+        const tables = document.querySelectorAll('.report-content table');
+        tables.forEach(table => {
+            // 已经被包装的表格跳过
+            if (table.parentElement.classList.contains('table-responsive-wrapper')) {
+                return;
+            }
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'table-responsive-wrapper';
+            
+            const hint = document.createElement('small');
+            hint.className = 'table-scroll-hint';
+            hint.textContent = '← 左右滑动查看完整表格 →';
+            
+            // 将表格包装在响应式容器中
+            table.parentNode.insertBefore(wrapper, table);
+            wrapper.appendChild(hint);
+            wrapper.appendChild(table);
+        });
+    }
     
     // 优化段落间距
     function enhanceParagraphSpacing() {
@@ -684,19 +1052,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 初始化时优化段落间距
-    enhanceParagraphSpacing();
+    // 初始化时优化段落间距和表格
+    if (reportContent) {
+        enhanceParagraphSpacing();
+        makeTablesResponsive();
+    }
     
-    // 阅读模式切换时重新优化
-    toggleReadingModeBtn.addEventListener('click', function() {
-        // 等待DOM更新后再处理
-        setTimeout(() => {
-            // 阅读模式下不需要重新结构化，只需要应用样式
-            const structuredReport = document.querySelector('.structured-report');
-            if (!structuredReport) {
-                enhanceParagraphSpacing();
-            }
-        }, 100);
+    // 窗口调整大小时处理
+    window.addEventListener('resize', function() {
+        if (window.innerWidth >= 992) {
+            // 大屏幕上重置状态
+            leftSidebar.classList.remove('show');
+            rightSidebar.classList.remove('show');
+            backdrop.classList.remove('show');
+        }
     });
 
     {% if claude_analysis %}
@@ -725,6 +1094,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 r: {
                     angleLines: {
@@ -764,6 +1135,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
                 r: {
                     angleLines: {
@@ -875,10 +1248,6 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* 目录样式 */
-#tocContainer {
-    transition: all 0.3s ease;
-}
-
 #toc .list-group-item {
     padding: 0.5rem 1rem;
     font-size: 14px;
@@ -892,32 +1261,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
 /* 段落样式 */
 .report-content p {
-    margin-bottom: 2.5em !important;
+    margin-bottom: 2em;
 }
 
 /* 增加段落间距 */
 .report-content {
-    line-height: 2.2 !important;
+    line-height: 2.2;
 }
 
 .report-content > * {
-    margin-bottom: 2.5em !important;
+    margin-bottom: 2em;
 }
 
 /* 空行处理 */
 .report-content br + br {
     display: block;
     content: "";
-    margin-top: 2em !important;
+    margin-top: 1.5em;
 }
 
 /* 数字列表项样式 */
-.report-content p:has(span:first-child:contains("1)"), span:first-child:contains("2)"), span:first-child:contains("3)")),
-.report-content div:has(span:first-child:contains("1)"), span:first-child:contains("2)"), span:first-child:contains("3)")),
-.report-content p:has(span:first-child:matches(/^\d+\)/)),
-.report-content div:has(span:first-child:matches(/^\d+\)/)) {
-    margin-top: 2.5em !important;
-    margin-bottom: 2.5em !important;
+.report-content p:first-child:contains("1)"),
+.report-content p:first-child:contains("2)"),
+.report-content p:first-child:contains("3)") {
+    margin-top: 2em;
+    margin-bottom: 2em;
     padding-left: 1em;
     border-left: 3px solid #e9ecef;
 }
@@ -927,10 +1295,10 @@ document.addEventListener('DOMContentLoaded', function() {
 .report-content p:contains("行业动向"),
 .report-content p:contains("公司概况"),
 .report-content p:contains("风险提示") {
-    font-weight: bold !important;
-    font-size: 1.2em !important;
-    margin-top: 3em !important;
-    margin-bottom: 1.5em !important;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-top: 2.5em;
+    margin-bottom: 1.5em;
     padding-bottom: 0.5em;
     border-bottom: 1px solid #e9ecef;
 }
