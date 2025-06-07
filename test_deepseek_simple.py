@@ -12,7 +12,7 @@ def main():
     
     # 创建OpenAI客户端
     client = OpenAI(
-        api_key="sk-6d7f57cfce3d44efacd826274a9d232f",  # 替换为您的DeepSeek API Key
+        api_key="YOUR_DEEPSEEK_API_KEY",  # 替换为您的DeepSeek API Key
         base_url="https://api.deepseek.com"
     )
     

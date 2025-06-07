@@ -13,7 +13,7 @@ def main():
     爬取一条研报，使用DeepSeek分析器分析，并将结果存入数据库
     """
     # 设置 DeepSeek API 密钥
-    os.environ["DEEPSEEK_API_KEY"] = "sk-6d7f57cfce3d44efacd826274a9d232f"
+    os.environ["DEEPSEEK_API_KEY"] = "YOUR_DEEPSEEK_API_KEY"
     
     print("开始测试爬取研报并使用DeepSeek分析...")
     
