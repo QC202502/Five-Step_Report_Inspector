@@ -34,6 +34,12 @@ env/
 # 数据库文件
 *.db
 *.sqlite3
+# 但保留数据库结构文件
+!database_schema.sql
+
+# 数据库备份文件
+database_backups/
+backup_*/
 
 # 日志文件
 *.log
@@ -45,6 +51,8 @@ logs/
 .env.development.local
 .env.test.local
 .env.production.local
+# 但保留示例环境变量文件
+!.env.example
 
 # API密钥（不要上传到GitHub）
 *api_key*
@@ -78,6 +86,9 @@ research_reports.json
 page_source_*.html
 report_detail_*.html
 latest_analysis.json
+latest_report.json
+analysis_report_*.json
+test_analysis_result.json
 
 # Flask相关
 flask_session/
@@ -85,6 +96,7 @@ flask_session/
 # 临时文件
 tmp/
 temp/
+*.bak
 
 # 缓存文件
 .cache/
