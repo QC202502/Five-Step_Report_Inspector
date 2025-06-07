@@ -40,10 +40,15 @@ env/
 # 数据库备份文件
 database_backups/
 backup_*/
+*_backup_*.db
+research_reports_backup_*.db
 
 # 日志文件
 *.log
 logs/
+scheduler.log
+db_maintenance.log
+deepseek_disable.log
 
 # 环境变量文件
 .env
@@ -89,6 +94,7 @@ latest_analysis.json
 latest_report.json
 analysis_report_*.json
 test_analysis_result.json
+wangye.html
 
 # Flask相关
 flask_session/
@@ -97,6 +103,7 @@ flask_session/
 tmp/
 temp/
 *.bak
+cleanup_tmp/
 
 # 缓存文件
 .cache/
@@ -104,4 +111,7 @@ temp/
 
 # Selenium
 chromedriver
-geckodriver 
+geckodriver
+
+# 临时清理目录
+cleanup_tmp/ 
