@@ -728,51 +728,6 @@ def get_evaluation_text(score):
     else:
         return "研报几乎未应用五步分析法，分析要素严重不足"
 
-# 添加从app.py中需要的两个函数
-
-    except Exception as e:
-        print(f"获取报告分析结果时出错: {e}")
-        return []
-    finally:
-        conn.close()
-
-    except Exception as e:
-        print(f"获取报告完整分析时出错: {e}")
-        return {
-            "full_analysis_text": "",
-            "one_line_summary": ""
-        }
-    finally:
-        conn.close()
-
-# 初始化数据库
-if __name__ == "__main__":
-    init_db()
-    
-    # 如果存在JSON文件，导入到数据库
-    if os.path.exists('research_reports.json'):
-        import_from_json() 
-# 适配器函数，使用新表结构替代旧表
-    # 将新格式转换为旧格式
-    result = {}
-    for step_name, step_data in analysis['steps'].items():
-        result[step_name] = {
-            'found': step_data['found'],
-            'description': step_data['description'],
-            'step_score': step_data['step_score'],
-            'keywords': [],  # 旧格式需要这些字段，但新格式可能没有
-            'evidence': [],
-            'framework_summary': step_data.get('framework_summary', '')
-        }
-    
-    return result
-
-    # 将新格式转换为旧格式
-    return {
-        'full_analysis_text': analysis['full_analysis'],
-        'one_line_summary': analysis['one_line_summary']
-    }
-
 # 适配器函数，使用新表结构替代旧表
 def get_analysis_results_for_report(report_id):
     """
@@ -782,27 +737,48 @@ def get_analysis_results_for_report(report_id):
     report_id (int): 研报ID
     
     返回:
-    dict: 分析结果字典
+    list: 分析结果列表
     """
-    from analysis_db import AnalysisDatabase
-    db = AnalysisDatabase()
-    analysis = db.get_analysis_by_report_id(report_id)
-    if not analysis:
-        return {}
-    
-    # 将新格式转换为旧格式
-    result = {}
-    for step_name, step_data in analysis['steps'].items():
-        result[step_name] = {
-            'found': step_data['found'],
-            'description': step_data['description'],
-            'step_score': step_data['step_score'],
-            'keywords': [],  # 旧格式需要这些字段，但新格式可能没有
-            'evidence': [],
-            'framework_summary': step_data.get('framework_summary', '')
-        }
-    
-    return result
+    try:
+        from analysis_db import AnalysisDatabase
+        db = AnalysisDatabase()
+        analysis = db.get_analysis_by_report_id(report_id)
+        
+        # 如果没有分析结果，返回空列表
+        if not analysis:
+            print(f"研报ID {report_id} 没有找到分析结果")
+            return []
+        
+        # 检查steps是否存在
+        if 'steps' not in analysis:
+            print(f"研报ID {report_id} 的分析结果中没有steps数据")
+            return []
+            
+        # 将新格式转换为旧格式（列表格式）
+        result = []
+        for step_name, step_data in analysis['steps'].items():
+            # 确保step_score有值
+            step_score = step_data.get('step_score', 0)
+            if step_score is None:
+                step_score = 0
+                
+            # 转换为旧格式
+            result.append({
+                'step_name': step_name,
+                'found': step_data.get('found', False),
+                'description': step_data.get('description', ''),
+                'step_score': step_score,
+                'keywords': [],  # 旧格式需要这些字段，但新格式可能没有
+                'evidence': [],
+                'framework_summary': step_data.get('framework_summary', '')
+            })
+        
+        return result
+    except Exception as e:
+        print(f"获取研报分析结果时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 def get_full_analysis_for_report(report_id):
     """
@@ -812,16 +788,36 @@ def get_full_analysis_for_report(report_id):
     report_id (int): 研报ID
     
     返回:
-    dict: 包含完整分析文本和一句话总结的字典
+    dict: 包含完整分析文本和一句话总结的字典，若不存在则返回空字典
     """
-    from analysis_db import AnalysisDatabase
-    db = AnalysisDatabase()
-    analysis = db.get_analysis_by_report_id(report_id)
-    if not analysis:
-        return None
+    try:
+        from analysis_db import AnalysisDatabase
+        db = AnalysisDatabase()
+        analysis = db.get_analysis_by_report_id(report_id)
+        
+        if not analysis:
+            print(f"研报ID {report_id} 没有找到分析结果")
+            return {'full_analysis_text': '', 'one_line_summary': ''}
+        
+        # 确保必要的字段存在
+        full_analysis = analysis.get('full_analysis', '')
+        one_line_summary = analysis.get('one_line_summary', '')
+        
+        # 将新格式转换为旧格式
+        return {
+            'full_analysis_text': full_analysis,
+            'one_line_summary': one_line_summary
+        }
+    except Exception as e:
+        print(f"获取报告完整分析时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'full_analysis_text': '', 'one_line_summary': ''}
+
+# 初始化数据库
+if __name__ == "__main__":
+    init_db()
     
-    # 将新格式转换为旧格式
-    return {
-        'full_analysis_text': analysis['full_analysis'],
-        'one_line_summary': analysis['one_line_summary']
-    }
+    # 如果存在JSON文件，导入到数据库
+    if os.path.exists('research_reports.json'):
+        import_from_json()
