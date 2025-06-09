@@ -52,7 +52,7 @@ def update_app_py(new_version):
     return True
 
 def update_readme(new_version):
-    """更新README.md中的版本号"""
+    """更新README.md中的版本号和相关内容"""
     file_path = 'README.md'
     if not os.path.exists(file_path):
         print(f"⚠️ 警告: 未找到{file_path}文件")
@@ -64,14 +64,34 @@ def update_readme(new_version):
     # 使用正则表达式替换版本号
     updated_content = re.sub(r'版本-[0-9.]+', f'版本-{new_version}', content)
     
+    # 从版本号判断是否为v0.5.0及以上版本（移除Claude分析器的版本）
+    version_parts = [int(x) for x in new_version.split('.')]
+    major, minor = version_parts[0], version_parts[1]
+    
+    # 如果是0.5.0及以上版本，确保README中只提到DeepSeek分析器
+    if major == 0 and minor >= 5:
+        # 更新分析引擎描述
+        updated_content = re.sub(
+            r'- \*\*多种分析引擎\*\*：支持 Claude 和 DeepSeek API 进行高质量语义分析',
+            r'- **分析引擎**：使用 DeepSeek API 进行高质量语义分析',
+            updated_content
+        )
+        
+        # 更新项目结构，移除Claude分析器
+        updated_content = re.sub(
+            r'- `claude_analyzer.py`：Claude 分析器\n- `deepseek_analyzer.py`：DeepSeek 分析器',
+            r'- `deepseek_analyzer.py`：DeepSeek 分析器',
+            updated_content
+        )
+    
     if content == updated_content:
-        print(f"⚠️ 警告: 无法在{file_path}中找到版本号标记")
+        print(f"⚠️ 警告: 无法在{file_path}中找到需要更新的内容")
         return False
         
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(updated_content)
         
-    print(f"✅ 已更新{file_path}中的版本号到 {new_version}")
+    print(f"✅ 已更新{file_path}中的版本号和相关内容到 {new_version}")
     return True
 
 def update_changelog(new_version, changes):
@@ -209,13 +229,21 @@ def update_git_push_readme(new_version, old_version):
     file_path = 'GIT_PUSH_README.md'
     today = datetime.datetime.now().strftime('%Y-%m-%d')
     
+    # 检查版本号，为0.5.0及以上版本添加特殊说明
+    version_parts = [int(x) for x in new_version.split('.')]
+    major, minor = version_parts[0], version_parts[1]
+    
+    # 准备版本特定的更新内容
+    version_specific_content = ""
+    if major == 0 and minor >= 5:
+        version_specific_content = "- 移除Claude分析器和关键词分析功能，仅使用DeepSeek API\n- 更新README.md以反映分析器变更\n"
+    
     template = f"""# Git推送指南
 
 ## v{new_version}版本更新内容
 
 本次更新（v{new_version}）主要包含以下内容：
-- [在此添加主要更新内容]
-- [在此添加主要更新内容]
+{version_specific_content}- [在此添加主要更新内容]
 - [在此添加主要更新内容]
 - [在此添加主要更新内容]
 
@@ -312,6 +340,14 @@ def main():
     print("\n✅ 版本更新完成!")
     print(f"当前版本: {args.new_version}")
     print(f"数据库备份目录: {backup_dir}")
+    
+    # 显示版本特定的信息
+    version_parts = [int(x) for x in args.new_version.split('.')]
+    major, minor = version_parts[0], version_parts[1]
+    if major == 0 and minor >= 5:
+        print("\n注意: 从v0.5.0开始，项目已移除Claude分析器和关键词分析功能，仅使用DeepSeek API")
+        print("README.md已自动更新以反映这些变化")
+    
     print("\n接下来的步骤:")
     print("1. 更新database_update_v{}.md文件，填写实际的数据库更新内容".format(args.new_version))
     print("2. 创建数据库备份")
