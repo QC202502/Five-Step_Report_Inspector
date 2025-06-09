@@ -1,6 +1,6 @@
 # 五步法研报分析器
 
-[![版本](https://img.shields.io/badge/版本-0.4.1-blue.svg)](https://github.com/yourusername/Five-Step_Report_Inspector)
+[![版本](https://img.shields.io/badge/版本-0.5.0-blue.svg)](https://github.com/yourusername/Five-Step_Report_Inspector)
 [![许可证](https://img.shields.io/badge/许可证-MIT-green.svg)](LICENSE)
 
 基于黄燕铭五步法的研报分析工具，支持自动爬取、分析和评估研究报告的质量。
@@ -9,7 +9,7 @@
 
 - **研报爬取**：自动从东方财富网爬取最新行业研究报告
 - **五步法分析**：使用黄燕铭五步法（信息、逻辑、超预期、催化剂、结论）分析研报质量
-- **多种分析引擎**：支持 Claude 和 DeepSeek API 进行高质量语义分析
+- **分析引擎**：使用 DeepSeek API 进行高质量语义分析
 - **数据可视化**：直观展示研报分析结果和行业统计数据
 - **数据库存储**：将研报和分析结果保存到 SQLite 数据库中，方便查询和管理
 
@@ -74,7 +74,6 @@ python test_crawl_and_analyze.py
 - `main.py`：爬虫和分析核心功能
 - `database.py`：数据库操作模块
 - `analysis_db.py`：分析结果数据库操作
-- `claude_analyzer.py`：Claude 分析器
 - `deepseek_analyzer.py`：DeepSeek 分析器
 - `templates/`：前端模板文件
 - `static/`：静态资源文件
