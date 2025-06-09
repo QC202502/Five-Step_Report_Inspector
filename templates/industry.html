@@ -32,6 +32,7 @@
                         <th>机构</th>
                         <th>日期</th>
                         <th>五步法分数</th>
+                        <th>逻辑</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -58,6 +59,15 @@
                                     aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
                                     {{ score }}%
                                 </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="logic-content small text-muted" style="max-width: 250px; max-height: 80px; overflow-y: auto;">
+                                {% if report.analysis.steps.逻辑 and report.analysis.steps.逻辑.framework_summary %}
+                                    {{ report.analysis.steps.逻辑.framework_summary|safe }}
+                                {% else %}
+                                    <span class="text-danger"><i class="fas fa-times-circle me-1"></i>未提供逻辑分析</span>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
