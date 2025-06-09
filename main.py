@@ -20,51 +20,18 @@ except ImportError:
     print("chromedriver_py未安装，请运行: python -m pip install chromedriver-py")
     chrome_driver_available = False
 
-# 导入Claude分析器
+# 导入DeepSeek分析器
 try:
-    from claude_analyzer import ClaudeAnalyzer
-    claude_analyzer = ClaudeAnalyzer()
-    claude_available = True
-    print("Claude分析器初始化成功")
+    from deepseek_analyzer import DeepSeekAnalyzer
+    deepseek_analyzer = DeepSeekAnalyzer()
+    deepseek_available = True
+    print("DeepSeek分析器初始化成功")
 except ImportError:
-    print("未找到Claude分析器模块，将使用传统分析方法")
-    claude_available = False
+    print("未找到DeepSeek分析器模块，将无法进行分析")
+    deepseek_available = False
 except Exception as e:
-    print(f"初始化Claude分析器时出错: {str(e)}")
-    claude_available = False
-
-# 黄燕铭五步分析法的关键词和解释 (更加细化)
-FIVE_STEP_KEYWORDS = {
-    "信息": {
-        "keywords": ["信息", "数据", "公告", "报告", "研究", "调研", "统计", "指标", "观察", "监测", 
-                   "显示", "表明", "证实", "发现", "发布", "披露", "公布", "新闻", "消息"],
-        "description": "收集和整理相关信息，包括公司公告、行业数据、政策变化等"
-    },
-    "逻辑": {
-        "keywords": ["逻辑", "分析", "推理", "判断", "思考", "推测", "认为", "观点", "看法", "角度", 
-                   "预计", "预期", "预测", "估计", "假设", "假定", "如果", "那么", "因为", "所以", 
-                   "由于", "导致", "造成", "引起", "影响", "关系", "相关", "关联", "对比", "比较"],
-        "description": "基于信息进行分析推理，形成对市场或个股的基本判断"
-    },
-    "超预期": {
-        "keywords": ["超预期", "惊喜", "意外", "出乎意料", "超出预期", "好于预期", "超过预期", "超过市场预期", 
-                   "超过一致预期", "出人意料", "出乎意料", "出乎预料", "超越预期", "大超预期", "远超预期", 
-                   "明显好于", "显著好于", "大幅好于", "远好于", "大幅超过"],
-        "description": "寻找市场共识之外的信息点，发现被低估或高估的因素"
-    },
-    "催化剂": {
-        "keywords": ["催化剂", "驱动", "事件", "因素", "推动", "促进", "加速", "刺激", "激发", "引发", 
-                   "触发", "带动", "助推", "利好", "政策", "规划", "计划", "方案", "措施", "行动", 
-                   "举措", "决定", "改革", "创新", "突破", "转折", "拐点", "时点", "节点", "窗口期"],
-        "description": "找出能够促使价格变动的关键事件或因素"
-    },
-    "结论": {
-        "keywords": ["结论", "建议", "评级", "目标价", "总结", "概括", "归纳", "综上", "综合", "总的来说", 
-                   "总体来看", "整体而言", "因此", "所以", "故此", "由此", "最终", "最后", "最重要", 
-                   "关键", "核心", "重点", "买入", "增持", "推荐", "看好", "看涨", "看跌", "减持", "卖出"],
-        "description": "给出明确的投资建议，包括评级、目标价等"
-    }
-}
+    print(f"初始化DeepSeek分析器时出错: {str(e)}")
+    deepseek_available = False
 
 def get_report_detail(url):
     """
@@ -330,7 +297,7 @@ def get_page_with_requests(url):
 
 def parse_reports_from_page(page_source):
     """
-    从页面内容解析研究报告
+    从页面内容解析研究报告，增强解析能力以适应网站结构变化
     """
     print("正在解析页面内容...")
     
@@ -341,18 +308,28 @@ def parse_reports_from_page(page_source):
     
     reports_list = []
     
-    # 查找所有研报链接，格式为 /report/zw_industry.jshtml?infocode=XX
-    report_links = soup.find_all('a', href=lambda href: href and 'zw_industry.jshtml' in href)
-    print(f"找到 {len(report_links)} 个研报链接")
+    # 检查是否是新版东方财富网页面结构
+    is_new_structure = False
+    if "研报列表" in page_source or "行业研报" in page_source:
+        print("检测到新版东方财富网页面结构")
+        is_new_structure = True
     
-    if report_links:
-        for link in report_links:
+    # 如果是新版结构，尝试查找表格行
+    if is_new_structure:
+        # 查找表格行
+        rows = soup.find_all('tr')
+        print(f"找到 {len(rows)} 个表格行")
+        
+        for row in rows:
             try:
-                # 获取研报标题
-                title = link.get_text(strip=True)
+                # 查找研报标题和链接
+                title_cell = row.find('a', href=lambda href: href and ('zw_industry.jshtml' in href or 'zw_stock.jshtml' in href))
+                if not title_cell:
+                    continue
                 
-                # 获取研报链接
-                href = link.get('href')
+                title = title_cell.get_text(strip=True)
+                href = title_cell.get('href')
+                
                 if href.startswith('//'):
                     full_link = f"https:{href}"
                 elif href.startswith('/'):
@@ -360,49 +337,85 @@ def parse_reports_from_page(page_source):
                 else:
                     full_link = href
                 
-                # 查找所在行
-                row = link.find_parent('tr')
-                if not row:
-                    continue
-                
-                # 获取行业信息 - 修正行业信息获取方法
+                # 获取行所有单元格
                 cells = row.find_all('td')
                 
-                # 调试：打印单元格数量和内容
-                print(f"找到 {len(cells)} 个单元格")
-                for i, cell in enumerate(cells[:5]):  # 只打印前5个单元格
-                    print(f"单元格 {i}: {cell.get_text(strip=True)}")
+                # 打印调试信息
+                print(f"研报标题: {title}")
+                print(f"研报链接: {full_link}")
+                print(f"单元格数量: {len(cells)}")
                 
-                # 行业信息通常在第一个或第二个单元格
+                # 提取行业信息 - 行业通常在第一列或特定列
                 industry = "未知行业"
-                if len(cells) > 0:
-                    # 尝试从第一个单元格获取行业
-                    industry_cell = cells[0].find('a')
-                    if industry_cell and industry_cell.get_text(strip=True):
-                        industry = industry_cell.get_text(strip=True)
-                    # 如果第一个单元格没有行业信息，尝试第二个单元格
-                    elif len(cells) > 1:
-                        industry_cell = cells[1].find('a')
-                        if industry_cell and industry_cell.get_text(strip=True):
-                            industry = industry_cell.get_text(strip=True)
-                
-                # 获取评级信息
-                cells = row.find_all('td')
-                
                 rating = ""
                 org = ""
                 date = ""
                 
-                if len(cells) >= 6:  # 确保有足够的单元格
-                    rating_cell = cells[5] if len(cells) > 5 else None
-                    rating = rating_cell.get_text(strip=True) if rating_cell else ""
+                # 查找行业列
+                industry_cell = None
+                
+                # 检查是否有行业列标题
+                headers = soup.find_all('th')
+                industry_col_index = -1
+                for i, header in enumerate(headers):
+                    header_text = header.get_text(strip=True)
+                    if "行业" in header_text:
+                        industry_col_index = i
+                        print(f"找到行业列索引: {industry_col_index}")
+                        break
+                
+                # 如果找到行业列索引，尝试从对应单元格获取行业信息
+                if industry_col_index >= 0 and industry_col_index < len(cells):
+                    industry_cell = cells[industry_col_index]
+                    industry_text = industry_cell.get_text(strip=True)
+                    # 检查是否是数字（如15、14等）
+                    if industry_text and not industry_text.isdigit():
+                        industry = industry_text
+                    else:
+                        # 如果是数字，尝试查找行业图标或其他指示
+                        industry_icon = industry_cell.find('i', class_=lambda c: c and 'icon' in c.lower())
+                        if industry_icon and industry_icon.get('title'):
+                            industry = industry_icon.get('title')
+                        elif industry_cell.find('img') and industry_cell.find('img').get('alt'):
+                            industry = industry_cell.find('img').get('alt')
+                
+                # 如果仍未找到行业，尝试从所有单元格中查找
+                if industry == "未知行业":
+                    for i, cell in enumerate(cells):
+                        cell_text = cell.get_text(strip=True)
+                        # 常见行业名称
+                        common_industries = ["食品饮料", "医药", "金融", "科技", "消费", "通信", "电子", "计算机", "汽车", "房地产", "能源", "化工"]
+                        for ind in common_industries:
+                            if ind in cell_text:
+                                industry = ind
+                                break
+                        if industry != "未知行业":
+                            break
+                
+                # 查找评级、机构和日期
+                for i, cell in enumerate(cells):
+                    cell_text = cell.get_text(strip=True)
                     
-                    org_cell = cells[7] if len(cells) > 7 else None
-                    org_link = org_cell.find('a') if org_cell else None
-                    org = org_link.get_text(strip=True) if org_link else ""
+                    # 评级通常包含特定关键词
+                    if cell_text in ["买入", "增持", "中性", "减持", "卖出", "强烈推荐", "推荐", "谨慎推荐", "持有", "回避"]:
+                        rating = cell_text
                     
-                    date_cell = cells[9] if len(cells) > 9 else None
-                    date = date_cell.get_text(strip=True) if date_cell else ""
+                    # 机构通常包含"证券"等关键词
+                    if "证券" in cell_text or "研究" in cell_text or "资本" in cell_text:
+                        org = cell_text
+                    
+                    # 日期通常是YYYY-MM-DD格式
+                    if re.match(r'\d{4}-\d{2}-\d{2}', cell_text) or re.match(r'\d{4}/\d{2}/\d{2}', cell_text):
+                        date = cell_text
+                
+                # 如果仍然没有找到行业，尝试从标题中提取
+                if industry == "未知行业" and title:
+                    # 常见行业关键词
+                    industry_keywords = ["医药", "科技", "金融", "消费", "房地产", "能源", "通信", "汽车", "食品", "电子", "互联网", "计算机", "传媒"]
+                    for keyword in industry_keywords:
+                        if keyword in title:
+                            industry = keyword
+                            break
                 
                 # 构建报告摘要
                 abstract = f"行业: {industry}, 评级: {rating}, 机构: {org}, 日期: {date}"
@@ -416,113 +429,140 @@ def parse_reports_from_page(page_source):
                     "org": org,
                     "date": date
                 })
-                print(f"解析到研报: {title}")
+                print(f"解析到研报: {title}, 行业: {industry}")
             except Exception as e:
-                print(f"解析研报链接时出错: {e}")
+                print(f"解析行时出错: {e}")
                 continue
     
-    # 如果未找到任何研报，使用备选逻辑
+    # 如果没有找到研报或不是新版结构，尝试旧版解析方法
     if not reports_list:
-        print("未找到任何研报，尝试备选解析逻辑...")
-        # 寻找行业研报表格
-        tables = soup.find_all('table')
-        for table in tables:
-            rows = table.find_all('tr')
-            if len(rows) > 1:  # 确保表格有内容（标题行+数据行）
-                for row in rows[1:]:  # 跳过标题行
-                    try:
-                        cells = row.find_all('td')
-                        if len(cells) < 5:
-                            continue
-                            
-                        # 尝试从单元格中提取研报数据 - 修正行业信息获取方法
-                        industry = "未知行业"
-                        
-                        # 调试：打印单元格数量和内容
-                        print(f"备选逻辑-找到 {len(cells)} 个单元格")
-                        for i, cell in enumerate(cells[:5]):  # 只打印前5个单元格
-                            print(f"备选逻辑-单元格 {i}: {cell.get_text(strip=True)}")
-                        
-                        # 行业信息通常在第一个或第二个单元格
-                        if len(cells) > 0:
-                            # 尝试从第一个单元格获取行业
-                            industry_cell = cells[0].find('a')
-                            if industry_cell and industry_cell.get_text(strip=True):
-                                industry = industry_cell.get_text(strip=True)
-                            # 如果第一个单元格没有行业信息，尝试第二个单元格
-                            elif len(cells) > 1:
-                                industry_cell = cells[1].find('a')
-                                if industry_cell and industry_cell.get_text(strip=True):
-                                    industry = industry_cell.get_text(strip=True)
-                        
-                        report_cell = cells[4].find('a') if len(cells) > 4 else None
-                        if not report_cell or not report_cell.get('href') or 'zw_industry.jshtml' not in report_cell.get('href'):
-                            continue
-                            
-                        title = report_cell.get_text(strip=True)
-                        href = report_cell.get('href')
-                        
-                        if href.startswith('//'):
-                            full_link = f"https:{href}"
-                        elif href.startswith('/'):
-                            full_link = f"https://data.eastmoney.com{href}"
-                        else:
-                            full_link = href
-                        
-                        rating_cell = cells[5] if len(cells) > 5 else None
-                        rating = rating_cell.get_text(strip=True) if rating_cell else ""
-                        
-                        org_cell = cells[7] if len(cells) > 7 else None
-                        org_link = org_cell.find('a') if org_cell else None
-                        org = org_link.get_text(strip=True) if org_link else ""
-                        
-                        date_cell = cells[9] if len(cells) > 9 else None
-                        date = date_cell.get_text(strip=True) if date_cell else ""
-                        
-                        # 构建报告摘要
-                        abstract = f"行业: {industry}, 评级: {rating}, 机构: {org}, 日期: {date}"
-                        
-                        reports_list.append({
-                            "title": title,
-                            "link": full_link,
-                            "abstract": abstract,
-                            "industry": industry,
-                            "rating": rating,
-                            "org": org,
-                            "date": date
-                        })
-                        print(f"解析到研报: {title}")
-                    except Exception as e:
-                        print(f"解析行时出错: {e}")
-                        continue
-    
-    # 如果仍然没有找到研报，进行最后的备选尝试
-    if not reports_list:
-        print("未能使用结构化方式找到研报，尝试提取所有包含'zw_industry'的链接...")
-        for a in soup.find_all('a'):
-            href = a.get('href', '')
-            text = a.get_text(strip=True)
-            if 'zw_industry.jshtml' in href and text:
+        # 方法1: 查找所有研报链接，格式为 /report/zw_industry.jshtml?infocode=XX
+        report_links = soup.find_all('a', href=lambda href: href and ('zw_industry.jshtml' in href or 'zw_stock.jshtml' in href))
+        print(f"找到 {len(report_links)} 个研报链接")
+        
+        if report_links:
+            for link in report_links:
                 try:
+                    # 获取研报标题
+                    title = link.get_text(strip=True)
+                    if not title:
+                        continue
+                    
+                    # 获取研报链接
+                    href = link.get('href')
                     if href.startswith('//'):
                         full_link = f"https:{href}"
                     elif href.startswith('/'):
                         full_link = f"https://data.eastmoney.com{href}"
                     else:
                         full_link = href
+                    
+                    # 查找所在行或父元素
+                    row = link.find_parent('tr')
+                    if not row:
+                        # 如果找不到tr父元素，尝试查找其他包含元素
+                        row = link.find_parent('div', class_=lambda c: c and ('item' in c.lower() or 'row' in c.lower()))
+                    
+                    # 初始化变量
+                    industry = "未知行业"
+                    rating = ""
+                    org = ""
+                    date = ""
+                    
+                    if row:
+                        # 尝试从行中提取信息
+                        # 查找所有文本节点
+                        all_texts = [text for text in row.stripped_strings]
                         
+                        # 打印调试信息
+                        print(f"行内文本: {all_texts}")
+                        
+                        # 尝试根据位置或特征提取信息
+                        if len(all_texts) >= 3:
+                            # 根据常见格式，尝试提取行业、评级、机构、日期
+                            for text in all_texts:
+                                # 尝试识别行业
+                                if len(text) < 10 and not text.isdigit() and (not industry or industry == "未知行业"):
+                                    industry = text
+                                
+                                # 尝试识别评级
+                                if text in ["买入", "增持", "中性", "减持", "卖出", "强烈推荐", "推荐", "谨慎推荐", "持有", "回避"]:
+                                    rating = text
+                                
+                                # 尝试识别日期 (YYYY-MM-DD格式)
+                                if re.match(r'\d{4}-\d{2}-\d{2}', text) or re.match(r'\d{4}/\d{2}/\d{2}', text):
+                                    date = text
+                                
+                                # 尝试识别机构 (通常包含"证券"、"研究"等字样)
+                                if "证券" in text or "研究" in text or "资本" in text or "投资" in text:
+                                    org = text
+                    
+                    # 如果没有找到行业信息，尝试从标题中提取
+                    if industry == "未知行业" and title:
+                        # 常见行业关键词
+                        industry_keywords = ["医药", "科技", "金融", "消费", "房地产", "能源", "通信", "汽车", "食品", "电子", "互联网", "计算机", "传媒"]
+                        for keyword in industry_keywords:
+                            if keyword in title:
+                                industry = keyword
+                                break
+                    
+                    # 构建报告摘要
+                    abstract = f"行业: {industry}, 评级: {rating}, 机构: {org}, 日期: {date}"
+                    
                     reports_list.append({
-                        "title": text,
+                        "title": title,
                         "link": full_link,
-                        "abstract": "行业研报",
-                        "industry": "未能确定行业",  # 尝试从标题提取行业信息
+                        "abstract": abstract,
+                        "industry": industry,
+                        "rating": rating,
+                        "org": org,
+                        "date": date
+                    })
+                    print(f"解析到研报: {title}, 行业: {industry}")
+                except Exception as e:
+                    print(f"解析研报链接时出错: {e}")
+                    continue
+    
+    # 如果未找到任何研报，使用更广泛的搜索方法
+    if not reports_list:
+        print("未找到任何研报，使用更广泛的搜索方法...")
+        
+        # 方法2: 查找所有可能的研报链接
+        all_links = soup.find_all('a')
+        for link in all_links:
+            try:
+                href = link.get('href', '')
+                title = link.get_text(strip=True)
+                
+                # 如果链接包含特定关键词且有标题文本
+                if (('report' in href or 'research' in href or 'pdf' in href) and title and len(title) > 5):
+                    if href.startswith('//'):
+                        full_link = f"https:{href}"
+                    elif href.startswith('/'):
+                        full_link = f"https://data.eastmoney.com{href}"
+                    else:
+                        full_link = href
+                    
+                    # 尝试从标题中提取行业信息
+                    industry = "未能确定行业"
+                    industry_keywords = ["医药", "科技", "金融", "消费", "房地产", "能源", "通信", "汽车", "食品", "电子", "互联网", "计算机", "传媒"]
+                    for keyword in industry_keywords:
+                        if keyword in title:
+                            industry = keyword
+                            break
+                    
+                    reports_list.append({
+                        "title": title,
+                        "link": full_link,
+                        "abstract": f"行业: {industry}",
+                        "industry": industry,
                         "rating": "",
                         "org": "",
                         "date": ""
                     })
-                    print(f"解析到研报: {text}")
-                except Exception as e:
-                    print(f"提取研报链接时出错: {e}")
+                    print(f"广泛搜索解析到研报: {title}, 行业: {industry}")
+            except Exception as e:
+                print(f"广泛搜索解析链接时出错: {e}")
     
     print(f"共解析出 {len(reports_list)} 条研报数据")
     return reports_list
@@ -543,39 +583,55 @@ def scrape_research_reports(url):
                 return parse_reports_from_page(page_source)
             return []
         
-        # 设置Chrome选项，确保浏览器窗口可见
+        # 设置Chrome选项，改进浏览器配置以提高稳定性
         chrome_options = Options()
-        chrome_options.add_argument("--start-maximized")  # 最大化窗口
+        chrome_options.add_argument("--window-size=1920,1080")  # 设置固定窗口大小
         chrome_options.add_argument("--disable-extensions")  # 禁用扩展
         chrome_options.add_argument("--disable-gpu")  # 禁用GPU加速
         chrome_options.add_argument("--no-sandbox")  # 禁用沙箱模式
         chrome_options.add_argument("--disable-dev-shm-usage")  # 禁用/dev/shm使用
-        chrome_options.headless = False  # 明确设置为非无头模式
+        chrome_options.add_argument("--disable-infobars")  # 禁用信息栏
+        chrome_options.add_argument("--disable-notifications")  # 禁用通知
+        chrome_options.add_argument("--disable-popup-blocking")  # 禁用弹出窗口阻止
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")  # 设置用户代理
+        
+        # 使用无头模式，减少资源消耗和提高稳定性
+        chrome_options.add_argument("--headless=new")  # 使用新的无头模式
         
         print("正在初始化Chrome浏览器...")
         
         # 创建Service对象，使用chromedriver-py提供的ChromeDriver路径
         service = Service(executable_path=binary_path)
         
-        # 设置超时
-        service.start()
-        
         # 初始化 Chrome 浏览器驱动，使用service对象
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
         print("Chrome浏览器已初始化，正在访问URL...")
         
-        # 设置页面加载超时
-        driver.set_page_load_timeout(30)
+        # 设置页面加载超时，增加超时时间
+        driver.set_page_load_timeout(60)  # 增加到60秒
         
         # 访问URL
         try:
             driver.get(url)
             print(f"已访问URL: {url}")
             
-            # 等待页面加载，这里简单等待几秒，实际应用中可以等待某个特定元素出现
-            print("等待页面加载(5秒)...")
-            time.sleep(5) # 暂停5秒，等待js加载数据，可能需要根据实际情况调整
+            # 增加等待时间，确保页面完全加载
+            print("等待页面加载(10秒)...")
+            time.sleep(10)  # 增加到10秒
+            
+            # 尝试滚动页面以加载更多内容
+            print("滚动页面以加载更多内容...")
+            try:
+                # 滚动到页面底部
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)  # 等待内容加载
+                
+                # 再滚动回页面中部
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+                time.sleep(2)  # 等待内容加载
+            except Exception as e:
+                print(f"滚动页面时出错: {e}")
             
             # 获取页面渲染后的源代码
             page_source = driver.page_source
@@ -586,27 +642,60 @@ def scrape_research_reports(url):
                 f.write(page_source)
             print("已保存页面源码到 page_source_selenium.html 文件")
             
-            return parse_reports_from_page(page_source)
+            # 尝试解析页面
+            reports = parse_reports_from_page(page_source)
+            
+            # 如果没有找到研报，尝试使用备选URL
+            if not reports:
+                print("未从主页面找到研报，尝试备选URL...")
+                backup_urls = [
+                    "https://data.eastmoney.com/report/industry.jshtml",  # 行业研报
+                    "https://data.eastmoney.com/report/stock.jshtml"      # 个股研报
+                ]
+                
+                for backup_url in backup_urls:
+                    print(f"尝试访问备选URL: {backup_url}")
+                    try:
+                        driver.get(backup_url)
+                        print(f"已访问备选URL: {backup_url}")
+                        
+                        # 等待页面加载
+                        print("等待备选页面加载(10秒)...")
+                        time.sleep(10)
+                        
+                        # 获取页面源码
+                        backup_page_source = driver.page_source
+                        
+                        # 保存备选页面源码
+                        with open(f"page_source_backup_{backup_url.split('/')[-1]}", "w", encoding="utf-8") as f:
+                            f.write(backup_page_source)
+                        
+                        # 解析备选页面
+                        backup_reports = parse_reports_from_page(backup_page_source)
+                        
+                        if backup_reports:
+                            print(f"从备选URL找到 {len(backup_reports)} 条研报")
+                            reports.extend(backup_reports)
+                            break
+                    except Exception as e:
+                        print(f"访问备选URL时出错: {e}")
+            
+            return reports
             
         except Exception as e:
             print(f"Selenium访问URL时出错: {e}")
             print("将尝试使用requests备选方法...")
-            page_source = get_page_with_requests(url)
-            if page_source:
-                return parse_reports_from_page(page_source)
-            return []
+            
+            # 尝试备选方法
+            return try_alternative_methods(url)
 
     except Exception as e:
         print(f"爬取过程中发生错误: {e}")
         import traceback
         traceback.print_exc()
         
-        # 尝试使用备选方法
-        print("将尝试使用requests备选方法...")
-        page_source = get_page_with_requests(url)
-        if page_source:
-            return parse_reports_from_page(page_source)
-        return [] # 发生错误时返回空列表
+        # 尝试备选方法
+        return try_alternative_methods(url)
     finally:
         if driver:
             print("关闭浏览器...")
@@ -616,10 +705,96 @@ def scrape_research_reports(url):
                 print(f"关闭浏览器时遇到错误: {e}")
     return []
 
-def analyze_with_five_steps(summary, content="", industry=None, use_claude=True):
+def try_alternative_methods(url):
+    """尝试多种备选方法获取研报数据"""
+    print("尝试多种备选方法获取研报数据...")
+    
+    # 方法1: 使用requests直接获取页面
+    print("方法1: 使用requests直接获取页面...")
+    page_source = get_page_with_requests(url)
+    if page_source:
+        reports = parse_reports_from_page(page_source)
+        if reports:
+            print(f"方法1成功: 获取到 {len(reports)} 条研报")
+            return reports
+    
+    # 方法2: 尝试备选URL
+    print("方法2: 尝试备选URL...")
+    backup_urls = [
+        "https://data.eastmoney.com/report/industry.jshtml",  # 行业研报
+        "https://data.eastmoney.com/report/stock.jshtml"      # 个股研报
+    ]
+    
+    for backup_url in backup_urls:
+        print(f"尝试备选URL: {backup_url}")
+        backup_page_source = get_page_with_requests(backup_url)
+        if backup_page_source:
+            backup_reports = parse_reports_from_page(backup_page_source)
+            if backup_reports:
+                print(f"从备选URL找到 {len(backup_reports)} 条研报")
+                return backup_reports
+    
+    # 方法3: 尝试API接口
+    print("方法3: 尝试API接口...")
+    try:
+        # 东方财富研报API
+        api_url = "https://reportapi.eastmoney.com/report/list"
+        params = {
+            "cb": "datatable",
+            "industryCode": "*",
+            "pageSize": "50",
+            "industry": "*",
+            "rating": "*",
+            "ratingChange": "*",
+            "beginTime": "2023-01-01",
+            "endTime": time.strftime("%Y-%m-%d"),
+            "pageNo": "1",
+            "fields": "",
+            "_": str(int(time.time() * 1000))
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+            'Referer': 'https://data.eastmoney.com/report/',
+            'Accept': '*/*'
+        }
+        
+        response = requests.get(api_url, params=params, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            # 提取JSON数据
+            text = response.text
+            if text.startswith("datatable("):
+                json_str = text[text.find("(")+1:text.rfind(")")]
+                try:
+                    data = json.loads(json_str)
+                    if "data" in data and len(data["data"]) > 0:
+                        reports_list = []
+                        for item in data["data"]:
+                            report = {
+                                "title": item.get("title", ""),
+                                "link": f"https://data.eastmoney.com/report/zw_industry.jshtml?infocode={item.get('infoCode', '')}",
+                                "abstract": f"行业: {item.get('industryName', '未知行业')}, 评级: {item.get('rating', '')}, 机构: {item.get('orgSName', '')}, 日期: {item.get('publishDate', '')}",
+                                "industry": item.get("industryName", "未知行业"),
+                                "rating": item.get("rating", ""),
+                                "org": item.get("orgSName", ""),
+                                "date": item.get("publishDate", "")
+                            }
+                            reports_list.append(report)
+                        
+                        print(f"从API接口获取到 {len(reports_list)} 条研报")
+                        return reports_list
+                except Exception as e:
+                    print(f"解析API数据时出错: {e}")
+    except Exception as e:
+        print(f"访问API接口时出错: {e}")
+    
+    print("所有备选方法都失败，返回空列表")
+    return []
+
+def analyze_with_five_steps(summary, content="", industry=None):
     """
-    使用黄燕铭五步分析法对报告摘要和内容进行分析。
-    默认使用Claude进行高级语义分析，提供更准确和详细的结果。
+    使用DeepSeek API对报告摘要和内容进行分析。
     
     黄燕铭五步分析法:
     1. 信息：收集和整理相关信息，包括公司公告、行业数据、政策变化等
@@ -636,87 +811,51 @@ def analyze_with_five_steps(summary, content="", industry=None, use_claude=True)
         报告内容
     industry : str, optional
         行业分类
-    use_claude : bool, optional
-        是否使用Claude进行分析，默认为True
         
     Returns:
     --------
     dict
         分析结果字典
     """
-    # 尝试使用Claude进行分析
-    if claude_available:
+    # 使用DeepSeek进行分析
+    if deepseek_available:
         try:
-            print("使用Claude进行高级语义分析...")
+            print("使用DeepSeek API进行分析...")
             # 提取标题
             title = summary.split('\n')[0] if '\n' in summary else summary[:100]
-            # 使用Claude分析器进行分析
-            result = claude_analyzer.analyze_with_five_steps(title, content, industry)
-            print("Claude分析完成")
+            # 使用DeepSeek分析器进行分析
+            result = deepseek_analyzer.analyze_with_five_steps(title, content, industry)
+            print("DeepSeek分析完成")
             return result["analysis"]
         except Exception as e:
-            print(f"Claude分析失败，将使用传统方法: {str(e)}")
-            # 如果Claude分析失败，回退到传统方法
+            print(f"DeepSeek分析失败: {str(e)}")
+            # 如果分析失败，返回空结果
+            return {
+                "信息": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+                "逻辑": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+                "超预期": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+                "催化剂": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+                "结论": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+                "summary": {
+                    "completeness_score": 0,
+                    "steps_found": 0,
+                    "evaluation": "分析失败，无法评估"
+                }
+            }
     else:
-        print("Claude分析器不可用，将使用传统关键词匹配方法")
-    
-    # 传统的关键词匹配分析方法（仅在Claude不可用时使用）
-    print("使用关键词匹配进行基础分析...")
-    analysis_results = {}
-    
-    # 合并摘要和内容进行分析
-    full_text = f"{summary} {content}"
-    
-    for step, step_info in FIVE_STEP_KEYWORDS.items():
-        keywords = step_info["keywords"]
-        description = step_info["description"]
-        
-        # 查找匹配的关键词
-        found_keywords = []
-        for keyword in keywords:
-            # 使用正则表达式进行更精确的匹配
-            pattern = r'[^\w]{}[^\w]|^{}[^\w]|[^\w]{}$|^{}$'.format(keyword, keyword, keyword, keyword)
-            if re.search(pattern, full_text, re.IGNORECASE):
-                found_keywords.append(keyword)
-        
-        # 提取包含关键词的句子作为证据
-        evidence = []
-        if found_keywords:
-            # 将文本分割成句子
-            sentences = re.split(r'[。！？.!?]', full_text)
-            for sentence in sentences:
-                for keyword in found_keywords:
-                    if keyword in sentence:
-                        # 清理句子并添加到证据中
-                        clean_sentence = sentence.strip()
-                        if clean_sentence and len(clean_sentence) > 5:  # 避免太短的句子
-                            evidence.append(clean_sentence)
-                            break  # 每个句子只添加一次
-        
-        # 限制证据数量，避免太多
-        if len(evidence) > 3:
-            evidence = evidence[:3]
-            
-        # 构建分析结果
-        analysis_results[step] = {
-            "found": len(found_keywords) > 0,
-            "keywords": found_keywords,
-            "evidence": evidence,
-            "description": description
+        print("DeepSeek分析器不可用，无法进行分析")
+        return {
+            "信息": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+            "逻辑": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+            "超预期": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+            "催化剂": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+            "结论": {"found": False, "keywords": [], "evidence": [], "step_score": 0},
+            "summary": {
+                "completeness_score": 0,
+                "steps_found": 0,
+                "evaluation": "分析器不可用，无法评估"
+            }
         }
-    
-    # 计算五步法完整度分数 (0-100)
-    steps_found = sum(1 for step_result in analysis_results.values() if step_result["found"])
-    completeness_score = int((steps_found / 5) * 100)
-    
-    # 添加总结
-    analysis_results["summary"] = {
-        "completeness_score": completeness_score,
-        "steps_found": steps_found,
-        "evaluation": get_evaluation_text(completeness_score)
-    }
-    
-    return analysis_results
 
 def get_evaluation_text(score):
     """根据完整度分数生成评价文本"""
@@ -794,4 +933,4 @@ if __name__ == "__main__":
     save_results(analyzed_reports)
 
     print("\n分析完成！请查看 research_reports.json 文件获取详细结果。")
-    print("使用Claude增强五步法分析已完成。") 
+    print("使用DeepSeek增强五步法分析已完成。") 

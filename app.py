@@ -10,7 +10,7 @@ import datetime
 import sqlite3
 import requests
 import logging
-from database import get_db_connection, get_reports_from_db, get_analysis_results_for_report, get_full_analysis_for_report
+from database import get_db_connection, get_reports_from_db
 import threading
 from analysis_db import AnalysisDatabase
 
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # 版本常量
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 # 数据库路径
 DATABASE_PATH = 'research_reports.db'
@@ -101,6 +101,37 @@ def report_detail(report_id):
     analysis_db = AnalysisDatabase()
     claude_analysis = analysis_db.get_analysis_by_report_id(report_id, analyzer_type='claude')
     deepseek_analysis = analysis_db.get_analysis_by_report_id(report_id, analyzer_type='deepseek')
+    
+    # 如果没有分析结果，创建默认占位结果以避免前端错误
+    if not claude_analysis and not deepseek_analysis:
+        # 记录缺少分析结果的情况，但不在页面上显示错误
+        logger.info(f"研报ID {report_id} 没有找到分析结果，将使用占位数据")
+        
+        # 创建默认的分析结果结构
+        default_analysis = {
+            'id': None,
+            'report_id': report_id,
+            'analyzer_type': 'placeholder',
+            'completeness_score': 0,
+            'evaluation': f"该研报《{report_dict.get('title', '未知标题')}》尚未分析，请点击分析按钮进行分析。",
+            'one_line_summary': '暂无分析结果',
+            'full_analysis': '尚未对该研报进行分析，请点击页面上的分析按钮开始分析。',
+            'created_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'steps': {
+                '信息': {'found': False, 'description': '暂无分析', 'step_score': 0, 'framework_summary': ''},
+                '逻辑': {'found': False, 'description': '暂无分析', 'step_score': 0, 'framework_summary': ''},
+                '超预期': {'found': False, 'description': '暂无分析', 'step_score': 0, 'framework_summary': ''},
+                '催化剂': {'found': False, 'description': '暂无分析', 'step_score': 0, 'framework_summary': ''},
+                '结论': {'found': False, 'description': '暂无分析', 'step_score': 0, 'framework_summary': ''}
+            },
+            'improvement_suggestions': []
+        }
+        
+        # 根据需要设置分析结果
+        if not claude_analysis:
+            claude_analysis = default_analysis
+        if not deepseek_analysis:
+            deepseek_analysis = default_analysis
     
     return render_template(
         'report_detail.html', 
@@ -505,52 +536,54 @@ def load_reports_from_db():
     """从数据库加载研报数据并构建完整的结构"""
     try:
         # 获取所有研报
-        reports = get_reports_from_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT * FROM reports ORDER BY id DESC
+        ''')
+        
+        reports = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        # 初始化分析数据库
+        analysis_db = AnalysisDatabase()
         
         # 对每个研报添加分析结果
         for report in reports:
             report_id = report["id"]
             
-            # 获取五步法分析结果
-            steps = get_analysis_results_for_report(report_id)
+            # 获取分析结果
+            analysis = analysis_db.get_analysis_by_report_id(report_id)
             
-            # 获取完整分析文本
-            full_analysis = get_full_analysis_for_report(report_id)
-            
-            # 已经在analysis字段中的数据，不需要重新构建
-            if "analysis" not in report:
+            if analysis:
                 # 构建分析结构
-                analysis = {}
-                
-                # 检查steps是否为字典类型
-                if isinstance(steps, dict):
-                    analysis["steps"] = steps
-                else:
-                    # 将步骤结果转换为预期结构
-                    formatted_steps = {}
-                    step_list = []
-                    
-                    for step in steps:
-                        step_name = step.get("step_name", "")
-                        formatted_steps[step_name] = step
-                        step_list.append(step)
-                    
-                    # 同时保留步骤字典和步骤列表
-                    analysis["steps"] = step_list
-                
-                # 计算完整性分数
-                completeness_score = calculate_completeness_score(steps)
-                
-                # 构建摘要信息
-                analysis["summary"] = {
-                    "completeness_score": completeness_score,
-                    "completeness_description": get_completeness_description(steps),
-                    "improvement_suggestions": get_improvement_suggestions(steps),
-                    "one_line_summary": full_analysis.get("one_line_summary", "") if full_analysis else ""
+                report["analysis"] = {
+                    "steps": analysis.get("steps", {}),
+                    "summary": {
+                        "completeness_score": analysis.get("completeness_score", 0),
+                        "completeness_description": get_completeness_description(analysis.get("completeness_score", 0)),
+                        "improvement_suggestions": "建议请参考详细分析页面",
+                        "one_line_summary": analysis.get("one_line_summary", "")
+                    }
                 }
-                
-                # 添加到报告
-                report["analysis"] = analysis
+            else:
+                # 创建默认分析结构
+                report["analysis"] = {
+                    "steps": {
+                        "信息": {"found": False, "step_score": 0},
+                        "逻辑": {"found": False, "step_score": 0},
+                        "超预期": {"found": False, "step_score": 0},
+                        "催化剂": {"found": False, "step_score": 0},
+                        "结论": {"found": False, "step_score": 0}
+                    },
+                    "summary": {
+                        "completeness_score": 0,
+                        "completeness_description": "尚未分析",
+                        "improvement_suggestions": "尚未分析",
+                        "one_line_summary": "尚未分析"
+                    }
+                }
             
             # 确保报告有内容字段
             report["content"] = report.get("full_content", report.get("content_preview", ""))
@@ -560,35 +593,15 @@ def load_reports_from_db():
         logger.error(f"从数据库加载研报数据出错: {e}")
         return []
 
-def calculate_completeness_score(steps):
-    """根据五步法各步骤的分数计算总得分"""
-    if not steps:
-        return 0
-    
-    # 处理不同的步骤数据结构
-    total_score = 0
-    count = 0
-        
-    if isinstance(steps, list):
-        # 列表形式
-        total_score = sum(step.get("step_score", 0) for step in steps)
-        count = len(steps)
-    elif isinstance(steps, dict):
-        # 字典形式
-        for step_key, step_data in steps.items():
-            if isinstance(step_data, dict):
-                step_score = step_data.get("step_score", 0)
-                total_score += step_score
-                count += 1
-    
-    return int(total_score / count) if count else 0
-
-def get_completeness_description(steps):
-    """根据五步法分析结果提供完整性评估描述"""
-    if not steps:
-        return "无法评估研报完整性，缺少分析数据。"
-        
-    score = calculate_completeness_score(steps)
+def get_completeness_description(score):
+    """根据完整性分数提供评估描述"""
+    if score is None:
+        score = 0
+    elif not isinstance(score, (int, float)):
+        try:
+            score = int(score)
+        except (ValueError, TypeError):
+            score = 0
     
     if score >= 80:
         return "该研报对五步法的应用非常完善，几乎涵盖了所有分析要素，分析深入全面，投资建议有充分依据。"
@@ -599,49 +612,9 @@ def get_completeness_description(steps):
     else:
         return "该研报对五步法的应用不足，多数分析要素缺失，分析浅显，投资建议依据不足。"
 
-def get_improvement_suggestions(steps):
-    """根据五步法分析结果提供改进建议"""
-    if not steps:
-        return "无法提供改进建议，缺少分析数据。"
-    
-    missing_steps = []
-    
-    # 处理不同的步骤数据结构
-    if isinstance(steps, list):
-        # 列表形式
-        for step in steps:
-            if step.get("step_score", 0) < 60:
-                step_name = step.get("step_name", "")
-                missing_steps.append(step_name)
-    elif isinstance(steps, dict):
-        # 字典形式
-        for step_name, step_data in steps.items():
-            if isinstance(step_data, dict) and step_data.get("step_score", 0) < 60:
-                missing_steps.append(step_name)
-    
-    if not missing_steps:
-        return "研报结构完整，建议保持当前分析质量。"
-    
-    suggestions = "建议加强以下方面的分析："
-    for step in missing_steps:
-        if "信息" in step:
-            suggestions += " 1) 收集更丰富的基础信息和数据；"
-        elif "逻辑" in step:
-            suggestions += " 2) 加强分析推理的逻辑性和连贯性；"
-        elif "超预期" in step:
-            suggestions += " 3) 深入挖掘市场共识之外的观点和信息；"
-        elif "催化剂" in step:
-            suggestions += " 4) 明确指出能够促使股价变动的关键因素；"
-        elif "结论" in step:
-            suggestions += " 5) 给出更明确的投资建议和目标价。"
-    
-    return suggestions
-
 @app.route('/analyze/<int:report_id>')
 def analyze_report(report_id):
     """分析研报"""
-    analyzer_type = request.args.get('analyzer', 'claude')
-    
     # 从数据库获取研报
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
@@ -660,22 +633,16 @@ def analyze_report(report_id):
     title, content, industry = result
     
     try:
-        if analyzer_type == 'claude':
-            # 使用Claude分析器
-            from claude_analyzer import ClaudeAnalyzer
-            analyzer = ClaudeAnalyzer()
-            analysis_result = analyzer.analyze_with_five_steps(title, content, industry)
-        else:
-            # 使用DeepSeek分析器
-            from deepseek_analyzer import DeepSeekAnalyzer
-            analyzer = DeepSeekAnalyzer()
-            analysis_result = analyzer.analyze_with_five_steps(title, content, industry)
+        # 使用DeepSeek分析器
+        from deepseek_analyzer import DeepSeekAnalyzer
+        analyzer = DeepSeekAnalyzer()
+        analysis_result = analyzer.analyze_with_five_steps(title, content, industry)
         
         # 保存分析结果到数据库
         analysis_db = AnalysisDatabase()
-        analysis_db.save_analysis_result(report_id, analysis_result, analyzer_type=analyzer_type)
+        analysis_db.save_analysis_result(report_id, analysis_result, analyzer_type='deepseek')
         
-        flash(f'使用{analyzer_type}分析完成', 'success')
+        flash('使用DeepSeek分析完成', 'success')
     except Exception as e:
         flash(f'分析失败: {str(e)}', 'error')
     
