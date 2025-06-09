@@ -11,6 +11,7 @@ import subprocess
 import requests  # 使用requests库直接调用API
 from contextlib import contextmanager
 import time
+from datetime import datetime
 
 class DeepSeekAnalyzer:
     """使用DeepSeek API进行研报五步法分析的分析器"""
@@ -481,4 +482,265 @@ class DeepSeekAnalyzer:
                 "completeness_score": 0,
                 "steps_found": 0,
                 "evaluation": "解析分析结果时出错"
-            } 
+            }
+
+    def generate_video_script(self, report_info, analysis_result):
+        """
+        生成适合投资顾问口播或短视频的文案
+        
+        Parameters:
+        -----------
+        report_info : dict
+            研报基本信息，包含标题、日期、机构等
+        analysis_result : dict
+            五步法分析结果
+            
+        Returns:
+        --------
+        str
+            生成的视频文案
+        """
+        try:
+            # 检查API密钥是否可用
+            api_key = os.environ.get('DEEPSEEK_API_KEY')
+            if not api_key:
+                try:
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                    api_key = os.environ.get('DEEPSEEK_API_KEY')
+                except ImportError:
+                    pass
+            
+            # 如果API密钥不可用，返回错误信息
+            if not api_key:
+                print("错误: API密钥不可用，无法生成视频文案")
+                return "错误: 无法生成视频文案。请先配置DeepSeek API密钥。您可以在.env文件中设置DEEPSEEK_API_KEY环境变量，或直接在系统中设置该环境变量。"
+            
+            # 提取需要的信息
+            title = report_info.get('title', '未知研报')
+            date = report_info.get('date', '未知日期')
+            org = report_info.get('org', '未知机构')
+            industry = report_info.get('industry', '未知行业')
+            rating = report_info.get('rating', '未知评级')
+            
+            # 获取五步法分析内容
+            steps = analysis_result.get('analysis', {})
+            info_summary = steps.get('信息', {}).get('framework_summary', '暂无信息梳理')
+            logic_summary = steps.get('逻辑', {}).get('framework_summary', '暂无逻辑梳理')
+            beyond_summary = steps.get('超预期', {}).get('framework_summary', '暂无超预期分析')
+            catalyst_summary = steps.get('催化剂', {}).get('framework_summary', '暂无催化剂分析')
+            conclusion_summary = steps.get('结论', {}).get('framework_summary', '暂无结论梳理')
+            
+            # 整体评分
+            score = analysis_result.get('analysis', {}).get('summary', {}).get('completeness_score', 0)
+            
+            # 生成视频文案的DeepSeek提示词
+            prompt = f"""请基于以下研报信息和五步法分析结果，生成一段详细、流畅的投资顾问口播文案，确保五个维度都得到充分展示。
+
+研报基本信息:
+- 标题: {title}
+- 发布日期: {date}
+- 发布机构: {org}
+- 行业: {industry}
+- 评级: {rating}
+
+研报五步法分析内容:
+- 信息梳理: {info_summary}
+- 逻辑框架: {logic_summary}
+- 超预期分析: {beyond_summary}
+- 催化剂: {catalyst_summary}
+- 结论: {conclusion_summary}
+
+请生成一段详细、连贯的口播文案，满足以下要求:
+1. 以简短的开场白引入研报主题和评级
+2. 按照五步法顺序组织内容，确保每个维度都有足够篇幅展示
+3. 详细介绍核心信息和关键数据点，包括行业现状、公司表现等
+4. 清晰解释投资逻辑和因果关系链，展示行业发展路径
+5. 具体说明超预期因素，解释为何这些因素超出市场预期
+6. 详细列举未来可能的催化剂事件及其潜在影响
+7. 给出明确的投资结论和标的推荐，简述投资理由
+
+语言要求：
+- 采用中文，句子简洁清晰但信息量充足
+- 使用自然流畅的口语化表达，适合朗读
+- 使用第一人称，如"我们认为..."
+- 段落之间要有自然过渡
+- 总字数控制在700-900字
+- 使用中文标点
+
+请确保五步法的每个维度都有充分展示，不要简化或省略任何关键信息。直接给出文案内容，不要添加任何额外的解释或标题。"""
+
+            # 调用DeepSeek API生成文案
+            video_script = self._ask_deepseek_for_script(prompt)
+            return video_script
+            
+        except Exception as e:
+            print(f"生成视频文案时出错: {str(e)}")
+            return f"生成视频文案失败: {str(e)}"
+    
+    def _ask_deepseek_for_script(self, prompt):
+        """
+        调用DeepSeek API生成视频文案
+        
+        Parameters:
+        -----------
+        prompt : str
+            生成视频文案的提示词
+            
+        Returns:
+        --------
+        str
+            生成的视频文案
+        """
+        # 获取API密钥
+        api_key = os.environ.get('DEEPSEEK_API_KEY')
+        if not api_key:
+            print("警告: 未设置DEEPSEEK_API_KEY环境变量")
+            # 尝试从配置文件获取
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+                api_key = os.environ.get('DEEPSEEK_API_KEY')
+            except ImportError:
+                print("提示: 未安装python-dotenv, 无法从.env文件加载配置")
+            
+            if not api_key:
+                print("错误: 无法获取DEEPSEEK_API_KEY，请设置环境变量或在.env文件中配置")
+                return "无法生成视频文案: API密钥未配置"
+        
+        data = {
+            "model": "deepseek-chat",
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "你是一位专业的投资顾问，擅长将研报分析转化为详细、流畅的口播文案。你需要确保五步法分析（信息、逻辑、超预期、催化剂、结论）的每个维度都得到充分展示，同时保持语言通俗易懂，适合向客户传达核心投资观点。"
+                },
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.5,  # 适中的温度，平衡创造性和准确性
+            "max_tokens": 2000,   # 增加token数量以支持更长的文案
+            "top_p": 0.95         # 略微提高多样性
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                print("正在调用DeepSeek API生成视频文案...")
+                response = requests.post(
+                    "https://api.deepseek.com/v1/chat/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=45  # 增加超时时间以处理更长的响应
+                )
+                
+                response.raise_for_status()
+                result = response.json()
+                
+                # 提取生成的文案
+                generated_text = result["choices"][0]["message"]["content"]
+                print(f"成功获取文案，长度: {len(generated_text)}字符")
+                
+                # 处理生成的文案，确保格式符合要求
+                processed_text = self._process_generated_script(generated_text)
+                
+                return processed_text
+                
+            except requests.exceptions.RequestException as e:
+                print(f"调用 DeepSeek API 生成视频文案时出错 (尝试 {attempt+1}/{max_retries}): {str(e)}")
+                if attempt < max_retries - 1:
+                    print(f"等待 {retry_delay} 秒后重试...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # 指数退避
+                else:
+                    print("达到最大重试次数，返回错误信息")
+                    return "很抱歉，目前无法生成视频文案。请稍后再试或联系系统管理员。"
+        
+        return "很抱歉，目前无法生成视频文案。请稍后再试或联系系统管理员。"
+        
+    def _process_generated_script(self, text):
+        """
+        处理生成的文案，确保格式符合要求
+        
+        Parameters:
+        -----------
+        text : str
+            生成的原始文案
+            
+        Returns:
+        --------
+        str
+            处理后的文案
+        """
+        # 移除可能的标题行或前言
+        lines = text.strip().split('\n')
+        
+        # 移除可能的引号包裹
+        text = text.strip('"\'')
+        
+        # 移除可能的标题行
+        if len(lines) > 1 and (lines[0].startswith('# ') or '文案' in lines[0] or '脚本' in lines[0] or '：' in lines[0]):
+            text = '\n'.join(lines[1:])
+        
+        # 合并多个空行为单个空行
+        text = re.sub(r'\n\s*\n', '\n\n', text)
+        
+        # 确保文案不超过字数限制
+        words = text.replace('\n', '').replace(' ', '')
+        if len(words) > 1000:  # 给予一些余量
+            print(f"警告: 生成的文案超过字数限制 ({len(words)}字)，将进行截断")
+            
+            # 尝试在句子结束处截断
+            sentences = re.split(r'([。！？])', text)
+            truncated_text = ""
+            char_count = 0
+            
+            for i in range(0, len(sentences), 2):
+                if i+1 < len(sentences):
+                    sentence = sentences[i] + sentences[i+1]
+                else:
+                    sentence = sentences[i]
+                    
+                if char_count + len(sentence.replace('\n', '').replace(' ', '')) <= 900:
+                    truncated_text += sentence
+                    char_count += len(sentence.replace('\n', '').replace(' ', ''))
+                else:
+                    break
+            
+            text = truncated_text
+            
+            # 确保文本以句号结尾
+            if not text.strip().endswith(('。', '！', '？')):
+                text = text.strip() + '。'
+        
+        # 检查是否包含五步法的关键内容
+        key_dimensions = {
+            '信息': ['数据', '信息', '行业现状', '公司表现', '核心数据'],
+            '逻辑': ['逻辑', '因果关系', '发展路径', '投资机会'],
+            '超预期': ['超预期', '超出预期', '超出市场预期', '市场预期'],
+            '催化剂': ['催化剂', '触发因素', '关键事件'],
+            '结论': ['结论', '评级', '推荐', '投资建议']
+        }
+        
+        missing_dimensions = []
+        
+        for dimension, keywords in key_dimensions.items():
+            dimension_found = False
+            for keyword in keywords:
+                if keyword in text:
+                    dimension_found = True
+                    break
+            
+            if not dimension_found:
+                missing_dimensions.append(dimension)
+        
+        if missing_dimensions:
+            print(f"警告: 生成的文案缺少以下维度: {', '.join(missing_dimensions)}")
+        
+        return text.strip() 

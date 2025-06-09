@@ -6,6 +6,7 @@ import json
 import re
 from typing import Dict, List, Any, Optional, Tuple
 import logging
+import datetime
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -17,59 +18,76 @@ class AnalysisDatabase:
     def __init__(self, db_path: str = 'research_reports.db'):
         """初始化数据库连接"""
         self.db_path = db_path
-        self._ensure_tables_exist()
+        self._init_db()
     
-    def _ensure_tables_exist(self):
-        """确保所有必要的表都存在"""
+    def _init_db(self):
+        """初始化数据库表结构"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 创建研报分析结果表
+        # 检查表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='report_video_scripts'")
+        video_scripts_exists = cursor.fetchone() is not None
+        
+        # 创建存储分析结果的表
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS report_analysis (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             report_id INTEGER NOT NULL,
             analyzer_type TEXT NOT NULL,
-            completeness_score INTEGER NOT NULL,
-            evaluation TEXT NOT NULL,
+            completeness_score INTEGER DEFAULT 0,
+            evaluation TEXT,
             one_line_summary TEXT,
-            full_analysis TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
+            created_at TEXT NOT NULL,
+            UNIQUE(report_id, analyzer_type)
         )
         ''')
         
-        # 创建五步法各步骤分析结果表
+        # 创建存储每个步骤分析结果的表
         cursor.execute('''
-        CREATE TABLE IF NOT EXISTS step_analysis (
+        CREATE TABLE IF NOT EXISTS analysis_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            analysis_id INTEGER NOT NULL,
+            report_id INTEGER NOT NULL,
+            analyzer_type TEXT NOT NULL,
             step_name TEXT NOT NULL,
-            found BOOLEAN NOT NULL,
+            found BOOLEAN DEFAULT 0,
+            keywords TEXT,
+            evidence TEXT,
             description TEXT,
-            step_score INTEGER NOT NULL,
             framework_summary TEXT,
-            FOREIGN KEY (analysis_id) REFERENCES report_analysis(id) ON DELETE CASCADE
+            improvement_suggestions TEXT,
+            step_score INTEGER DEFAULT 0,
+            UNIQUE(report_id, analyzer_type, step_name)
         )
         ''')
         
-        # 创建改进建议表
+        # 创建存储完整分析文本的表
         cursor.execute('''
-        CREATE TABLE IF NOT EXISTS improvement_suggestions (
+        CREATE TABLE IF NOT EXISTS report_full_analysis (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            analysis_id INTEGER NOT NULL,
-            point TEXT NOT NULL,
-            suggestion TEXT NOT NULL,
-            FOREIGN KEY (analysis_id) REFERENCES report_analysis(id) ON DELETE CASCADE
+            report_id INTEGER NOT NULL,
+            analyzer_type TEXT NOT NULL,
+            full_text TEXT,
+            UNIQUE(report_id, analyzer_type)
         )
         ''')
         
-        # 确保索引存在
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_analysis_report_id ON report_analysis(report_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_analysis_analyzer_type ON report_analysis(analyzer_type)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_step_analysis_analysis_id ON step_analysis(analysis_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_step_analysis_step_name ON step_analysis(step_name)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_improvement_suggestions_analysis_id ON improvement_suggestions(analysis_id)')
+        # 仅当表不存在时创建视频文案表
+        if not video_scripts_exists:
+            try:
+                cursor.execute('''
+                CREATE TABLE report_video_scripts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    report_id INTEGER NOT NULL,
+                    script_text TEXT,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(report_id)
+                )
+                ''')
+                print("成功创建视频文案表")
+            except sqlite3.OperationalError as e:
+                # 表可能已存在
+                print(f"创建视频文案表时出现信息（可能表已存在）: {str(e)}")
         
         conn.commit()
         conn.close()
@@ -508,6 +526,97 @@ class AnalysisDatabase:
         except Exception as e:
             logger.error(f"插入分析结果时出错: {str(e)}")
             raise
+
+    def save_video_script(self, report_id: int, script_text: str) -> int:
+        """
+        保存研报的视频文案
+        
+        Parameters:
+        -----------
+        report_id : int
+            研报ID
+        script_text : str
+            生成的视频文案
+            
+        Returns:
+        --------
+        int
+            新插入或更新的记录ID
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 检查是否已存在
+            cursor.execute('''
+            SELECT id FROM report_video_scripts 
+            WHERE report_id = ?
+            ''', (report_id,))
+            
+            existing_script = cursor.fetchone()
+            
+            if existing_script:
+                # 更新现有记录
+                cursor.execute('''
+                UPDATE report_video_scripts
+                SET script_text = ?, created_at = ?
+                WHERE report_id = ?
+                ''', (script_text, now, report_id))
+                script_id = existing_script[0]
+            else:
+                # 插入新记录
+                cursor.execute('''
+                INSERT INTO report_video_scripts (report_id, script_text, created_at)
+                VALUES (?, ?, ?)
+                ''', (report_id, script_text, now))
+                script_id = cursor.lastrowid
+            
+            conn.commit()
+            return script_id
+            
+        except Exception as e:
+            print(f"保存视频文案时出错: {str(e)}")
+            conn.rollback()
+            return 0
+        finally:
+            conn.close()
+    
+    def get_video_script(self, report_id: int) -> str:
+        """
+        获取研报的视频文案
+        
+        Parameters:
+        -----------
+        report_id : int
+            研报ID
+            
+        Returns:
+        --------
+        str
+            视频文案文本，如果不存在则返回空字符串
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+            SELECT script_text FROM report_video_scripts 
+            WHERE report_id = ?
+            ''', (report_id,))
+            
+            result = cursor.fetchone()
+            
+            if result:
+                return result[0]
+            return ""
+            
+        except Exception as e:
+            print(f"获取视频文案时出错: {str(e)}")
+            return ""
+        finally:
+            conn.close()
 
 # 测试代码
 if __name__ == "__main__":

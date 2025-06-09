@@ -14,6 +14,10 @@ from database import get_db_connection, get_reports_from_db
 import threading
 from analysis_db import AnalysisDatabase
 
+# 创建Flask应用
+app = Flask(__name__)
+app.secret_key = 'five_step_report_inspector_secret_key'  # 设置密钥
+
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -22,8 +26,6 @@ logger = logging.getLogger(__name__)
 VERSION = "0.5.0"
 # 数据库路径
 DATABASE_PATH = 'research_reports.db'
-
-app = Flask(__name__)
 
 # 全局变量，存储爬取状态
 scraping_status = {"is_scraping": False, "message": ""}
@@ -646,6 +648,82 @@ def analyze_report(report_id):
         flash(f'分析失败: {str(e)}', 'error')
     
     return redirect(url_for('report_detail', report_id=report_id))
+
+@app.route('/generate_video_script/<int:report_id>')
+def generate_video_script(report_id):
+    """生成研报的视频文案"""
+    logger.info(f"开始为研报ID {report_id} 生成视频文案")
+    
+    # 从数据库获取研报信息
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    SELECT * FROM reports WHERE id = ?
+    ''', (report_id,))
+    
+    report = cursor.fetchone()
+    conn.close()
+    
+    if not report:
+        logger.error(f"未找到研报ID {report_id}")
+        flash('未找到研报', 'error')
+        return redirect(url_for('index'))
+    
+    # 转换为字典
+    report_info = dict(report)
+    logger.info(f"获取到研报信息: {report_info['title']}")
+    
+    # 获取分析结果
+    analysis_db = AnalysisDatabase()
+    analysis_result = analysis_db.get_analysis_by_report_id(report_id, analyzer_type='deepseek')
+    
+    if not analysis_result:
+        logger.warning(f"研报ID {report_id} 尚未进行分析")
+        flash('请先进行研报分析', 'warning')
+        return redirect(url_for('report_detail', report_id=report_id))
+    
+    try:
+        # 使用DeepSeek生成视频文案
+        from deepseek_analyzer import DeepSeekAnalyzer
+        analyzer = DeepSeekAnalyzer()
+        logger.info("调用DeepSeek生成视频文案")
+        video_script = analyzer.generate_video_script(report_info, analysis_result)
+        
+        if video_script and video_script != "无法生成视频文案: API密钥未配置":
+            # 保存视频文案到数据库
+            logger.info("成功生成视频文案，正在保存到数据库")
+            script_id = analysis_db.save_video_script(report_id, video_script)
+            if script_id:
+                logger.info(f"视频文案已保存，ID: {script_id}")
+                flash('视频文案生成完成', 'success')
+            else:
+                logger.error("保存视频文案到数据库失败")
+                flash('视频文案生成成功，但保存失败', 'warning')
+        else:
+            logger.error(f"视频文案生成失败: {video_script}")
+            flash('视频文案生成失败: API密钥未配置或生成内容为空', 'error')
+    except Exception as e:
+        logger.exception(f"生成视频文案时出错: {str(e)}")
+        flash(f'生成视频文案失败: {str(e)}', 'error')
+    
+    return redirect(url_for('report_detail', report_id=report_id))
+
+@app.route('/get_video_script/<int:report_id>')
+def get_video_script(report_id):
+    """获取研报的视频文案"""
+    logger.info(f"获取研报ID {report_id} 的视频文案")
+    # 从数据库获取视频文案
+    analysis_db = AnalysisDatabase()
+    video_script = analysis_db.get_video_script(report_id)
+    
+    if not video_script:
+        logger.warning(f"未找到研报ID {report_id} 的视频文案")
+        return jsonify({"success": False, "message": "未找到视频文案", "script": ""})
+    
+    logger.info(f"成功获取视频文案，长度: {len(video_script)}")
+    return jsonify({"success": True, "message": "获取成功", "script": video_script})
 
 if __name__ == '__main__':
     # 初始化应用

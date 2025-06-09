@@ -430,6 +430,24 @@
                                 </div>
                                 {% endif %}
                                 
+                                <!-- 视频文案生成按钮 -->
+                                <div class="card mb-3">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">投资顾问口播文案</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="small">生成适合投资顾问短视频/口播使用的文案，基于五步法分析结果。</p>
+                                        <div class="d-grid gap-2">
+                                            <a href="/generate_video_script/{{ report.id }}" class="btn btn-info btn-sm">
+                                                <i class="fas fa-video me-1"></i> 生成视频文案
+                                            </a>
+                                            <button type="button" class="btn btn-outline-info btn-sm" id="showVideoScript">
+                                                <i class="fas fa-eye me-1"></i> 查看文案
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <!-- 查看详细分析按钮 -->
                                 <button class="btn btn-outline-primary btn-sm w-100" id="showDeepseekDetails">
                                     查看详细分析 <i class="fas fa-chevron-down"></i>
@@ -478,6 +496,38 @@
         </div>
     </div>
 </div>
+
+<!-- 视频文案模态框 -->
+<div class="modal fade" id="videoScriptModal" tabindex="-1" aria-labelledby="videoScriptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="videoScriptModalLabel">投资顾问口播文案</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle me-2"></i> 以下是根据五步法分析生成的投资顾问口播/短视频文案，适合直接使用或稍作修改后使用。
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div id="videoScriptContent" class="p-3" style="white-space: pre-wrap; line-height: 1.8;">
+                            正在加载文案内容...
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button type="button" class="btn btn-sm btn-success" id="copyScriptBtn">
+                        <i class="fas fa-copy me-1"></i> 复制文案
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -498,9 +548,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (toggleLeftBtn) {
         toggleLeftBtn.addEventListener('click', function() {
             leftSidebar.classList.add('show');
-            backdrop.classList.add('show');
-            // 确保右侧边栏关闭
-            rightSidebar.classList.remove('show');
+            document.body.classList.add('sidebar-open');
+            backdrop.style.display = 'block';
         });
     }
     
@@ -508,9 +557,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (toggleRightBtn) {
         toggleRightBtn.addEventListener('click', function() {
             rightSidebar.classList.add('show');
-            backdrop.classList.add('show');
-            // 确保左侧边栏关闭
-            leftSidebar.classList.remove('show');
+            document.body.classList.add('sidebar-open');
+            backdrop.style.display = 'block';
         });
     }
     
@@ -518,7 +566,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closeLeftBtn) {
         closeLeftBtn.addEventListener('click', function() {
             leftSidebar.classList.remove('show');
-            backdrop.classList.remove('show');
+            document.body.classList.remove('sidebar-open');
+            backdrop.style.display = 'none';
         });
     }
     
@@ -526,7 +575,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closeRightBtn) {
         closeRightBtn.addEventListener('click', function() {
             rightSidebar.classList.remove('show');
-            backdrop.classList.remove('show');
+            document.body.classList.remove('sidebar-open');
+            backdrop.style.display = 'none';
         });
     }
     
@@ -535,197 +585,15 @@ document.addEventListener('DOMContentLoaded', function() {
         backdrop.addEventListener('click', function() {
             leftSidebar.classList.remove('show');
             rightSidebar.classList.remove('show');
-            backdrop.classList.remove('show');
+            document.body.classList.remove('sidebar-open');
+            backdrop.style.display = 'none';
         });
     }
     
-    // 详细分析切换
-    const showDeepseekDetailsBtn = document.getElementById('showDeepseekDetails');
-    const deepseekDetailsContainer = document.getElementById('deepseekDetailsContainer');
-    
-    if (showDeepseekDetailsBtn && deepseekDetailsContainer) {
-        showDeepseekDetailsBtn.addEventListener('click', function() {
-            deepseekDetailsContainer.classList.toggle('d-none');
-            if (deepseekDetailsContainer.classList.contains('d-none')) {
-                this.innerHTML = '查看详细分析 <i class="fas fa-chevron-down"></i>';
-            } else {
-                this.innerHTML = '隐藏详细分析 <i class="fas fa-chevron-up"></i>';
-            }
-        });
-    }
-    
-    // 字体大小控制
-    const increaseFontBtn = document.getElementById('increaseFontBtn');
-    const decreaseFontBtn = document.getElementById('decreaseFontBtn');
-    const resetFontBtn = document.getElementById('resetFontBtn');
-    
-    if (reportContent && increaseFontBtn && decreaseFontBtn && resetFontBtn) {
-        // 获取当前字体大小
-        let currentSize = parseInt(window.getComputedStyle(reportContent).fontSize);
-        const defaultSize = currentSize;
-        
-        // 增加字体大小
-        increaseFontBtn.addEventListener('click', function() {
-            if (currentSize < 24) {
-                currentSize += 1;
-                reportContent.style.fontSize = currentSize + 'px';
-            }
-        });
-        
-        // 减小字体大小
-        decreaseFontBtn.addEventListener('click', function() {
-            if (currentSize > 12) {
-                currentSize -= 1;
-                reportContent.style.fontSize = currentSize + 'px';
-            }
-        });
-        
-        // 重置字体大小
-        resetFontBtn.addEventListener('click', function() {
-            currentSize = defaultSize;
-            reportContent.style.fontSize = defaultSize + 'px';
-        });
-    }
-    
-    // 阅读模式切换
-    const toggleReadingModeBtn = document.getElementById('toggleReadingModeBtn');
-    
-    if (reportContent && toggleReadingModeBtn) {
-        toggleReadingModeBtn.addEventListener('click', function() {
-            reportContent.classList.toggle('reading-mode');
-            if (reportContent.classList.contains('reading-mode')) {
-                this.innerHTML = '<i class="fas fa-compress"></i> 退出阅读模式';
-            } else {
-                this.innerHTML = '<i class="fas fa-book-reader"></i> 阅读模式';
-            }
-        });
-    }
-    
-    // 打印功能
-    const printReportBtn = document.getElementById('printReportBtn');
-    
-    if (printReportBtn) {
-        printReportBtn.addEventListener('click', function() {
-            window.print();
-        });
-    }
-    
-    // 生成目录
-    function generateTOC() {
-        const toc = document.getElementById('toc');
-        if (!toc || !reportContent) return;
-        
-        // 清空现有目录
-        toc.innerHTML = '';
-        
-        // 查找所有可能的标题
-        const headings = reportContent.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        if (headings.length === 0) {
-            // 如果没有标题，尝试从段落中提取
-            const paragraphs = reportContent.querySelectorAll('p');
-            let counter = 0;
-            
-            for (let i = 0; i < paragraphs.length; i++) {
-                const p = paragraphs[i];
-                const text = p.textContent.trim();
-                
-                // 检查是否是标题样式的段落（短且不以标点结尾）
-                if (text.length < 50 && !text.match(/[。？！，；：,.!?;:]$/)) {
-                    counter++;
-                    if (counter > 10) break; // 最多添加10个目录项
-                    
-                    const item = document.createElement('a');
-                    item.href = '#';
-                    item.className = 'list-group-item list-group-item-action small';
-                    item.textContent = text;
-                    
-                    item.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        p.scrollIntoView({ behavior: 'smooth' });
-                    });
-                    
-                    toc.appendChild(item);
-                }
-            }
-        } else {
-            // 使用实际标题
-            headings.forEach((heading, index) => {
-                const id = `heading-${index}`;
-                heading.id = id;
-                
-                const item = document.createElement('a');
-                item.href = `#${id}`;
-                item.className = 'list-group-item list-group-item-action small';
-                item.textContent = heading.textContent;
-                
-                // 根据标题级别添加缩进
-                const level = parseInt(heading.tagName.substring(1));
-                item.style.paddingLeft = `${(level - 1) * 10 + 10}px`;
-                
-                toc.appendChild(item);
-            });
-        }
-    }
-    
-    // 增强段落间距
-    function enhanceParagraphSpacing() {
-        if (!reportContent) return;
-        
-        const paragraphs = reportContent.querySelectorAll('p');
-        paragraphs.forEach(p => {
-            if (p.textContent.trim().length > 0) {
-                p.style.marginBottom = '1.5em';
-            }
-        });
-    }
-    
-    // 使表格响应式
-    function makeTablesResponsive() {
-        if (!reportContent) return;
-        
-        const tables = reportContent.querySelectorAll('table');
-        tables.forEach(table => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'table-responsive-wrapper';
-            
-            const hint = document.createElement('div');
-            hint.className = 'table-scroll-hint';
-            hint.textContent = '左右滑动查看更多';
-            
-            const tableResponsive = document.createElement('div');
-            tableResponsive.className = 'table-responsive';
-            
-            // 将表格包装在响应式容器中
-            table.parentNode.insertBefore(wrapper, table);
-            wrapper.appendChild(hint);
-            wrapper.appendChild(tableResponsive);
-            tableResponsive.appendChild(table);
-            
-            // 添加Bootstrap表格类
-            table.classList.add('table', 'table-striped', 'table-bordered');
-        });
-    }
-    
-    // 初始化时优化段落间距和表格
-    if (reportContent) {
-        enhanceParagraphSpacing();
-        makeTablesResponsive();
-    }
-    
-    // 窗口调整大小时处理
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 992) {
-            // 大屏幕上重置状态
-            leftSidebar.classList.remove('show');
-            rightSidebar.classList.remove('show');
-            backdrop.classList.remove('show');
-        }
-    });
-
+    // 初始化雷达图
     {% if deepseek_analysis %}
-    // DeepSeek雷达图
-    const deepseekCtx = document.getElementById('deepseekRadarChart').getContext('2d');
-    const deepseekChart = new Chart(deepseekCtx, {
+    const deepseekRadarCtx = document.getElementById('deepseekRadarChart').getContext('2d');
+    const deepseekChart = new Chart(deepseekRadarCtx, {
         type: 'radar',
         data: {
             labels: ['信息', '逻辑', '超预期', '催化剂', '结论'],
@@ -738,18 +606,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     {{ deepseek_analysis.steps.催化剂.step_score }},
                     {{ deepseek_analysis.steps.结论.step_score }}
                 ],
-                fill: true,
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                borderColor: 'rgb(75, 192, 192)',
-                pointBackgroundColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(54, 162, 235, 1)',
                 pointBorderColor: '#fff',
                 pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: 'rgb(75, 192, 192)'
+                pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
             scales: {
                 r: {
                     angleLines: {
@@ -762,6 +628,137 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     {% endif %}
+    
+    // 字体大小控制
+    const decreaseFontBtn = document.getElementById('decreaseFontBtn');
+    const resetFontBtn = document.getElementById('resetFontBtn');
+    const increaseFontBtn = document.getElementById('increaseFontBtn');
+    const defaultFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    
+    // 减小字体
+    if (decreaseFontBtn) {
+        decreaseFontBtn.addEventListener('click', function() {
+            const currentSize = parseFloat(getComputedStyle(reportContent).fontSize);
+            reportContent.style.fontSize = (currentSize - 1) + 'px';
+        });
+    }
+    
+    // 重置字体
+    if (resetFontBtn) {
+        resetFontBtn.addEventListener('click', function() {
+            reportContent.style.fontSize = '16px';
+        });
+    }
+    
+    // 增大字体
+    if (increaseFontBtn) {
+        increaseFontBtn.addEventListener('click', function() {
+            const currentSize = parseFloat(getComputedStyle(reportContent).fontSize);
+            reportContent.style.fontSize = (currentSize + 1) + 'px';
+        });
+    }
+    
+    // 详细分析折叠控制
+    const showDeepseekDetailsBtn = document.getElementById('showDeepseekDetails');
+    const deepseekDetailsContainer = document.getElementById('deepseekDetailsContainer');
+    
+    if (showDeepseekDetailsBtn && deepseekDetailsContainer) {
+        showDeepseekDetailsBtn.addEventListener('click', function() {
+            if (deepseekDetailsContainer.classList.contains('d-none')) {
+                deepseekDetailsContainer.classList.remove('d-none');
+                showDeepseekDetailsBtn.innerHTML = '隐藏详细分析 <i class="fas fa-chevron-up"></i>';
+            } else {
+                deepseekDetailsContainer.classList.add('d-none');
+                showDeepseekDetailsBtn.innerHTML = '查看详细分析 <i class="fas fa-chevron-down"></i>';
+            }
+        });
+    }
+    
+    // 阅读模式控制
+    const toggleReadingModeBtn = document.getElementById('toggleReadingModeBtn');
+    const mainContent = document.querySelector('.content-main');
+    
+    if (toggleReadingModeBtn && mainContent) {
+        toggleReadingModeBtn.addEventListener('click', function() {
+            if (mainContent.classList.contains('reading-mode')) {
+                // 退出阅读模式
+                mainContent.classList.remove('reading-mode');
+                toggleReadingModeBtn.innerHTML = '<i class="fas fa-book-reader"></i> 阅读模式';
+                // 恢复侧边栏
+                leftSidebar.classList.remove('d-none');
+                rightSidebar.classList.remove('d-none');
+            } else {
+                // 进入阅读模式
+                mainContent.classList.add('reading-mode');
+                toggleReadingModeBtn.innerHTML = '<i class="fas fa-times"></i> 退出阅读模式';
+                // 隐藏侧边栏
+                leftSidebar.classList.add('d-none');
+                rightSidebar.classList.add('d-none');
+            }
+        });
+    }
+    
+    // 打印研报
+    const printReportBtn = document.getElementById('printReportBtn');
+    
+    if (printReportBtn) {
+        printReportBtn.addEventListener('click', function() {
+            window.print();
+        });
+    }
+    
+    // 视频文案功能
+    const showVideoScriptBtn = document.getElementById('showVideoScript');
+    if (showVideoScriptBtn) {
+        const videoScriptModal = new bootstrap.Modal(document.getElementById('videoScriptModal'));
+        const videoScriptContent = document.getElementById('videoScriptContent');
+        
+        showVideoScriptBtn.addEventListener('click', function() {
+            // 显示加载状态
+            videoScriptContent.textContent = "正在加载文案内容...";
+            videoScriptModal.show();
+            
+            // 从API获取视频文案
+            fetch(`/get_video_script/{{ report.id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.script) {
+                        videoScriptContent.textContent = data.script;
+                    } else {
+                        videoScriptContent.innerHTML = `<div class="alert alert-warning">
+                            <i class="fas fa-exclamation-circle me-2"></i> 
+                            尚未生成视频文案，请点击"生成视频文案"按钮。
+                        </div>`;
+                    }
+                })
+                .catch(error => {
+                    videoScriptContent.innerHTML = `<div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> 
+                        获取视频文案失败: ${error}
+                    </div>`;
+                });
+        });
+        
+        // 复制文案按钮
+        const copyScriptBtn = document.getElementById('copyScriptBtn');
+        if (copyScriptBtn) {
+            copyScriptBtn.addEventListener('click', function() {
+                const scriptText = videoScriptContent.textContent;
+                navigator.clipboard.writeText(scriptText)
+                    .then(() => {
+                        const originalText = copyScriptBtn.innerHTML;
+                        copyScriptBtn.innerHTML = '<i class="fas fa-check me-1"></i> 已复制';
+                        setTimeout(() => {
+                            copyScriptBtn.innerHTML = originalText;
+                        }, 2000);
+                    })
+                    .catch(err => {
+                        console.error('复制失败:', err);
+                        alert('复制失败，请手动复制文本');
+                    });
+            });
+        }
+    }
 });
 </script>
 
