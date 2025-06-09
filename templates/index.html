@@ -12,33 +12,62 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-8">
-                        <p class="lead">本系统基于黄燕铭的五步分析法对研究报告进行评估，五步分析法包括：</p>
                         <div class="row mb-3">
-                            {% set step_icons = ["fas fa-info-circle", "fas fa-brain", "fas fa-lightbulb", "fas fa-rocket", "fas fa-flag-checkered"] %}
-                            {% set step_colors = ["primary", "success", "warning", "info", "danger"] %}
-                            {% set steps = ["信息", "逻辑", "超预期", "催化剂", "结论"] %}
-                            {% set descriptions = [
-                                "收集和整理相关信息，包括公司公告、行业数据、政策变化等",
-                                "基于信息进行分析推理，形成对市场或个股的基本判断",
-                                "寻找市场共识之外的信息点，发现被低估或高估的因素",
-                                "找出能够促使价格变动的关键事件或因素",
-                                "给出明确的投资建议，包括评级、目标价等"
-                            ] %}
+                            <div class="col-12 mb-3">
+                                <h5 class="text-primary mb-3"><i class="fas fa-tools me-2"></i>系统功能</h5>
+                            </div>
                             
-                            {% for step in range(5) %}
-                            <div class="col-md-6 mb-2">
-                                <div class="card h-100">
-                                    <div class="card-body">
-                                        <h5>
-                                            <i class="{{ step_icons[step] }} text-{{ step_colors[step] }} me-2"></i>
-                                            <span class="badge bg-{{ step_colors[step] }} me-1">{{ loop.index }}</span>
-                                            {{ steps[step] }}
-                                        </h5>
-                                        <p class="mb-0 small text-muted">{{ descriptions[step] }}</p>
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100 border-primary hover-card">
+                                    <div class="card-body text-center">
+                                        <div class="feature-icon mb-2">
+                                            <i class="fas fa-search fa-2x text-primary"></i>
+                                        </div>
+                                        <h5 class="card-title">研报检索</h5>
+                                        <p class="card-text small">快速搜索和浏览研报库</p>
+                                        <a href="/search" class="stretched-link"></a>
                                     </div>
                                 </div>
                             </div>
-                            {% endfor %}
+                            
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100 border-success hover-card">
+                                    <div class="card-body text-center">
+                                        <div class="feature-icon mb-2">
+                                            <i class="fas fa-chart-pie fa-2x text-success"></i>
+                                        </div>
+                                        <h5 class="card-title">统计分析</h5>
+                                        <p class="card-text small">研报质量和行业分布统计</p>
+                                        <a href="/stats" class="stretched-link"></a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100 border-info hover-card">
+                                    <div class="card-body text-center">
+                                        <div class="feature-icon mb-2">
+                                            <i class="fas fa-video fa-2x text-info"></i>
+                                        </div>
+                                        <h5 class="card-title">视频脚本</h5>
+                                        <p class="card-text small">生成投资顾问口播文案</p>
+                                        <a href="#reportList" class="stretched-link" title="选择研报生成视频脚本"></a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-12 mt-2">
+                                <div class="alert alert-light border">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-info-circle text-primary me-2"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-2 small">
+                                            本系统基于<a href="/about" class="text-decoration-none">黄燕铭五步分析法</a>评估研报质量，通过信息、逻辑、超预期、催化剂和结论五个维度进行全面分析。
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -137,7 +166,7 @@
     </div>
 </div>
 
-<div class="row mb-4">
+<div class="row mb-4" id="reportList">
     <div class="col-md-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
