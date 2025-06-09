@@ -426,6 +426,89 @@ class AnalysisDatabase:
         finally:
             conn.close()
 
+    def insert_report(self, title, link, industry, rating, org, date, content):
+        """
+        将研报信息插入到数据库中
+        
+        Parameters:
+        -----------
+        title : str
+            研报标题
+        link : str
+            研报链接
+        industry : str
+            行业分类
+        rating : str
+            评级
+        org : str
+            发布机构
+        date : str
+            发布日期
+        content : str
+            研报内容
+            
+        Returns:
+        --------
+        int
+            新插入的研报ID
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # 插入研报信息
+            cursor.execute('''
+            INSERT INTO reports (title, link, industry, rating, org, date, full_content, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            ''', (title, link, industry, rating, org, date, content))
+            
+            report_id = cursor.lastrowid
+            conn.commit()
+            logger.info(f"插入新研报，ID: {report_id}, 标题: {title}")
+            return report_id
+            
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"插入研报时出错: {str(e)}")
+            raise
+        finally:
+            conn.close()
+    
+    def insert_analysis(self, report_id, analyzer_type, analysis_json):
+        """
+        将分析结果插入到数据库中
+        
+        Parameters:
+        -----------
+        report_id : int
+            研报ID
+        analyzer_type : str
+            分析器类型
+        analysis_json : str
+            JSON格式的分析结果
+            
+        Returns:
+        --------
+        int
+            新插入的分析ID
+        """
+        try:
+            # 解析JSON
+            analysis_data = json.loads(analysis_json)
+            
+            # 调用现有的save_analysis_result方法
+            analysis_id = self.save_analysis_result(report_id, analysis_data, analyzer_type)
+            
+            logger.info(f"插入新分析，ID: {analysis_id}, 研报ID: {report_id}")
+            return analysis_id
+            
+        except json.JSONDecodeError:
+            logger.error("无法解析JSON格式的分析结果")
+            raise
+        except Exception as e:
+            logger.error(f"插入分析结果时出错: {str(e)}")
+            raise
+
 # 测试代码
 if __name__ == "__main__":
     db = AnalysisDatabase()

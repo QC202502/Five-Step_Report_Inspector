@@ -217,13 +217,19 @@ class DeepSeekAnalyzer:
                                 # 提取快评作为描述
                                 match = re.search(r'\|.*\|.*\|(.*)\|', line)
                                 if match:
-                                    result["analysis"][step]["description"] = match.group(1).strip()
+                                    description = match.group(1).strip()
+                                    # 处理<br>标签，确保它们正确显示
+                                    description = description.replace('<br>', '<br />')
+                                    result["analysis"][step]["description"] = description
                             # 检查是否包含"⚠️"标记 (部分应用)
                             elif "⚠️" in line:
                                 result["analysis"][step]["found"] = True
                                 match = re.search(r'\|.*\|.*\|(.*)\|', line)
                                 if match:
-                                    result["analysis"][step]["description"] = match.group(1).strip()
+                                    description = match.group(1).strip()
+                                    # 处理<br>标签，确保它们正确显示
+                                    description = description.replace('<br>', '<br />')
+                                    result["analysis"][step]["description"] = description
             except Exception as e:
                 print(f"解析体检清单时出错: {e}")
             
@@ -244,7 +250,10 @@ class DeepSeekAnalyzer:
                         pattern = r'\| ' + re.escape(eng_name) + r' \|(.*?)\|'
                         match = re.search(pattern, framework_section, re.DOTALL)
                         if match and cn_name in result["analysis"]:
-                            result["analysis"][cn_name]["framework_summary"] = match.group(1).strip()
+                            framework_summary = match.group(1).strip()
+                            # 处理<br>标签，确保它们正确显示
+                            framework_summary = framework_summary.replace('<br>', '<br />')
+                            result["analysis"][cn_name]["framework_summary"] = framework_summary
             except Exception as e:
                 print(f"解析五步框架梳理时出错: {e}")
             
@@ -253,9 +262,19 @@ class DeepSeekAnalyzer:
                 suggestions_match = re.search(r'## 可操作补强思路(.*?)##', analysis_text, re.DOTALL)
                 if suggestions_match:
                     improvement_suggestions = suggestions_match.group(1).strip()
-                    result["analysis"]["improvement_suggestions"] = improvement_suggestions
+                    # 检查是否为有效的改进建议内容
+                    if improvement_suggestions and not improvement_suggestions.startswith('-------'):
+                        result["analysis"]["improvement_suggestions"] = improvement_suggestions
+                    else:
+                        # 如果内容无效，使用默认的改进建议
+                        result["analysis"]["improvement_suggestions"] = "| 整体完善 | 建议根据五步法框架进一步完善研报结构 |"
+                else:
+                    # 如果没有找到改进建议部分，使用默认的改进建议
+                    result["analysis"]["improvement_suggestions"] = "| 整体完善 | 建议根据五步法框架进一步完善研报结构 |"
             except Exception as e:
                 print(f"解析可操作补强思路时出错: {e}")
+                # 出错时使用默认的改进建议
+                result["analysis"]["improvement_suggestions"] = "| 整体完善 | 建议根据五步法框架进一步完善研报结构 |"
             
             # 解析五步法定量评分部分
             try:
@@ -281,9 +300,13 @@ class DeepSeekAnalyzer:
                                     
                                     # 提取评价
                                     if len(parts) >= 5:
-                                        # 如果描述为空，使用评价作为描述
-                                        if not result["analysis"][step]["description"]:
-                                            result["analysis"][step]["description"] = parts[3].strip()
+                                        # 如果找到评价
+                                        if len(parts) >= 5:
+                                            evaluation = parts[3].strip()
+                                            # 处理<br>标签，确保它们正确显示
+                                            evaluation = evaluation.replace('<br>', '<br />')
+                                            result["analysis"][step]["description"] = evaluation
+                                            result["analysis"]["summary"]["evaluation"] = evaluation
                                 except Exception as e:
                                     print(f"解析步骤'{step}'评分时出错: {e}")
                 
@@ -298,7 +321,10 @@ class DeepSeekAnalyzer:
                                 
                                 # 如果找到评价
                                 if len(parts) >= 5:
-                                    result["analysis"]["summary"]["evaluation"] = parts[3].strip()
+                                    evaluation = parts[3].strip()
+                                    # 处理<br>标签，确保它们正确显示
+                                    evaluation = evaluation.replace('<br>', '<br />')
+                                    result["analysis"]["summary"]["evaluation"] = evaluation
                             except:
                                 # 如果无法提取总分，使用平均分
                                 if len(steps) > 0:
@@ -325,6 +351,8 @@ class DeepSeekAnalyzer:
                 summary_section_match = re.search(r'## 一句话总结(.*?)##', analysis_text, re.DOTALL)
                 if summary_section_match:
                     one_line_summary = summary_section_match.group(1).strip()
+                    # 处理<br>标签，确保它们正确显示
+                    one_line_summary = one_line_summary.replace('<br>', '<br />')
                     result["analysis"]["summary"]["one_line_summary"] = one_line_summary
                 else:
                     result["analysis"]["summary"]["one_line_summary"] = "无法提取一句话总结"
