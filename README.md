@@ -1,6 +1,6 @@
 # 五步法研报分析器
 
-[![版本](https://img.shields.io/badge/版本-0.5.0-blue.svg)](https://github.com/yourusername/Five-Step_Report_Inspector)
+[![版本](https://img.shields.io/badge/版本-0.5.0-blue.svg?t=1701156201)](https://github.com/QC202502/Five-Step_Report_Inspector)
 [![许可证](https://img.shields.io/badge/许可证-MIT-green.svg)](LICENSE)
 
 基于黄燕铭五步法的研报分析工具，支持自动爬取、分析和评估研究报告的质量。
