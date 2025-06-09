@@ -148,9 +148,9 @@
                     </a>
                 </div>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover table-fixed">
+            <div class="card-body p-2">
+                <div class="table-container">
+                    <table class="table table-striped table-hover table-fixed mb-0">
                         <thead>
                             <tr>
                                 <th width="3%">#</th>
@@ -167,7 +167,7 @@
                         <tbody>
                             {% for report in reports %}
                             <tr>
-                                <td>{{ loop.index }}</td>
+                                <td class="index-cell">{{ loop.index }}</td>
                                 <td class="table-title-cell">{{ report.title }}</td>
                                 <td>
                                     <a href="/industry/{{ report.industry }}" class="badge bg-secondary text-decoration-none">

@@ -3,7 +3,7 @@
 {% block title %}{{ industry }} - 行业研报{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="row mb-4">
         <div class="col-12">
             <h2 class="text-center">{{ industry }} - 行业研报</h2>
@@ -23,57 +23,59 @@
 
     {% if reports %}
     <div class="row">
-        <div class="col-12 table-responsive">
-            <table class="table table-hover table-fixed">
-                <thead>
-                    <tr>
-                        <th width="30%">标题</th>
-                        <th width="10%">评级</th>
-                        <th width="15%">机构</th>
-                        <th width="10%">日期</th>
-                        <th width="15%">五步法分数</th>
-                        <th width="20%">逻辑</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for report in reports %}
-                    <tr>
-                        <td><a href="/report/{{ report.id }}" class="table-title-cell d-inline-block">{{ report.title }}</a></td>
-                        <td>{{ report.rating }}</td>
-                        <td><span class="table-org-cell d-inline-block">{{ report.org }}</span></td>
-                        <td>{{ report.date }}</td>
-                        <td>
-                            <div class="progress" style="height: 20px;">
-                                {% set score = report.analysis.summary.completeness_score %}
-                                {% if score >= 80 %}
-                                    {% set bg_class = "bg-success" %}
-                                {% elif score >= 60 %}
-                                    {% set bg_class = "bg-info" %}
-                                {% elif score >= 40 %}
-                                    {% set bg_class = "bg-warning" %}
-                                {% else %}
-                                    {% set bg_class = "bg-danger" %}
-                                {% endif %}
-                                <div class="progress-bar {{ bg_class }}" role="progressbar" 
-                                    style="width: {{ score }}%;" 
-                                    aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
-                                    {{ score }}%
+        <div class="col-12">
+            <div class="table-container">
+                <table class="table table-hover table-fixed mb-0">
+                    <thead>
+                        <tr>
+                            <th width="30%">标题</th>
+                            <th width="10%">评级</th>
+                            <th width="15%">机构</th>
+                            <th width="10%">日期</th>
+                            <th width="15%">五步法分数</th>
+                            <th width="20%">逻辑</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for report in reports %}
+                        <tr>
+                            <td><a href="/report/{{ report.id }}" class="table-title-cell d-block">{{ report.title }}</a></td>
+                            <td>{{ report.rating }}</td>
+                            <td><span class="table-org-cell d-inline-block">{{ report.org }}</span></td>
+                            <td>{{ report.date }}</td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    {% set score = report.analysis.summary.completeness_score %}
+                                    {% if score >= 80 %}
+                                        {% set bg_class = "bg-success" %}
+                                    {% elif score >= 60 %}
+                                        {% set bg_class = "bg-info" %}
+                                    {% elif score >= 40 %}
+                                        {% set bg_class = "bg-warning" %}
+                                    {% else %}
+                                        {% set bg_class = "bg-danger" %}
+                                    {% endif %}
+                                    <div class="progress-bar {{ bg_class }}" role="progressbar" 
+                                        style="width: {{ score }}%;" 
+                                        aria-valuenow="{{ score }}" aria-valuemin="0" aria-valuemax="100">
+                                        {{ score }}%
+                                    </div>
                                 </div>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="logic-content small text-muted" style="max-width: 250px; max-height: 80px; overflow-y: auto;">
-                                {% if report.analysis.steps.逻辑 and report.analysis.steps.逻辑.framework_summary %}
-                                    {{ report.analysis.steps.逻辑.framework_summary|safe }}
-                                {% else %}
-                                    <span class="text-danger"><i class="fas fa-times-circle me-1"></i>未提供逻辑分析</span>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td>
+                                <div class="logic-content small text-muted" style="max-width: 250px; max-height: 80px; overflow-y: auto;">
+                                    {% if report.analysis.steps.逻辑 and report.analysis.steps.逻辑.framework_summary %}
+                                        {{ report.analysis.steps.逻辑.framework_summary|safe }}
+                                    {% else %}
+                                        <span class="text-danger"><i class="fas fa-times-circle me-1"></i>未提供逻辑分析</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     {% else %}

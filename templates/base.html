@@ -54,7 +54,8 @@
             max-width: 350px;
             overflow: hidden;
             text-overflow: ellipsis;
-            white-space: nowrap;
+            white-space: normal !important; /* 允许换行 */
+            line-height: 1.3;
         }
         
         .logic-content {
@@ -67,12 +68,61 @@
         .table-fixed {
             table-layout: fixed;
         }
+        
+        /* 序号单元格样式 */
+        .index-cell {
+            text-align: center;
+            vertical-align: middle !important;
+            padding: 0.5rem !important;
+        }
+        
+        /* 确保表格行没有多余的间距 */
+        .table tr {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        /* 优化表格容器样式 */
+        .table-container {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+        
+        /* 设置表格间距和行高 */
+        .table {
+            margin-bottom: 0;
+        }
+        
+        .table td, .table th {
+            padding: 0.6rem;
+            vertical-align: middle;
+        }
+        
+        /* 调整表格卡片布局 */
+        .card-body {
+            padding: 1rem;
+        }
+        
+        /* 调整页面间距 */
+        .row {
+            margin-bottom: 1rem !important;
+        }
+        
+        /* 调整各列宽度比例，更紧凑的布局 */
+        @media (min-width: 768px) {
+            .px-md-2 {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
+    <!-- 主导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container-fluid">
             <a class="navbar-brand" href="/">
                 <img src="{{ url_for('static', filename='images/acorn_icon.png') }}" width="30" height="30" class="d-inline-block align-top me-2" alt="橡子图标">
                 五步法研报检查器
@@ -110,7 +160,9 @@
         </div>
     </nav>
 
-    <div class="container py-4">
+    <!-- 主要内容区域 -->
+    <div class="container-fluid px-3">
+        <!-- 主内容 -->
         {% block content %}{% endblock %}
     </div>
 
