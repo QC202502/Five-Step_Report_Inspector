@@ -125,14 +125,15 @@
                         <thead>
                             <tr>
                                 <th width="3%">#</th>
-                                <th width="25%">研报标题</th>
+                                <th width="20%">研报标题</th>
                                 <th width="8%">行业</th>
-                                <th width="7%">评级</th>
-                                <th width="10%">机构</th>
+                                <th width="6%">评级</th>
+                                <th width="8%">机构</th>
                                 <th width="7%">日期</th>
                                 <th width="10%">五步法评分</th>
-                                <th width="20%">逻辑</th>
-                                <th width="10%">操作</th>
+                                <th width="17%">逻辑</th>
+                                <th width="17%">超预期</th>
+                                <th width="4%">操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -190,6 +191,15 @@
                                     </div>
                                 </td>
                                 <td>
+                                    <div class="logic-content small text-muted" style="max-width: 250px; max-height: 80px; overflow-y: auto;">
+                                        {% if report.analysis.steps.超预期 and report.analysis.steps.超预期.framework_summary %}
+                                            {{ report.analysis.steps.超预期.framework_summary|safe }}
+                                        {% else %}
+                                            <span class="text-danger"><i class="fas fa-times-circle me-1"></i>未提供超预期分析</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
                                     <a href="/report/{{ report.id }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-file-alt me-1"></i>详情
                                     </a>
@@ -197,7 +207,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="9" class="text-center py-4">
+                                <td colspan="10" class="text-center py-4">
                                     <div class="alert alert-warning mb-0">
                                         <i class="fas fa-exclamation-triangle me-2"></i>未找到符合条件的研报，请尝试其他筛选条件。
                                     </div>
