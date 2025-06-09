@@ -16,6 +16,58 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <style>
+        .sidebar-content {
+            position: sticky;
+            top: 20px;
+        }
+        .stats-card {
+            border-radius: 10px;
+            transition: transform 0.3s;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+        .stats-number {
+            font-size: 2rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stats-title {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+        }
+        
+        /* 表格列宽控制 */
+        .table-org-cell {
+            max-width: 100px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .table-title-cell {
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .logic-content {
+            max-height: 80px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        
+        .table-fixed {
+            table-layout: fixed;
+        }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
