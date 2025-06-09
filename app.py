@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, jsonify, request, redirect, url_for, abort, flash
+from flask import Flask, render_template, jsonify, request, redirect, url_for, abort, flash, Markup
 import json
 import os
 import sys
@@ -17,6 +17,17 @@ from analysis_db import AnalysisDatabase
 # 创建Flask应用
 app = Flask(__name__)
 app.secret_key = 'five_step_report_inspector_secret_key'  # 设置密钥
+
+# 创建分析数据库实例
+analysis_db = AnalysisDatabase()
+
+# 添加nl2br过滤器，用于在HTML中显示换行
+@app.template_filter('nl2br')
+def nl2br(value):
+    """将换行符转换为HTML的<br>标签"""
+    if not value:
+        return ""
+    return Markup(value.replace('\n', '<br>'))
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -713,17 +724,41 @@ def generate_video_script(report_id):
 @app.route('/get_video_script/<int:report_id>')
 def get_video_script(report_id):
     """获取研报的视频文案"""
-    logger.info(f"获取研报ID {report_id} 的视频文案")
-    # 从数据库获取视频文案
-    analysis_db = AnalysisDatabase()
-    video_script = analysis_db.get_video_script(report_id)
-    
-    if not video_script:
-        logger.warning(f"未找到研报ID {report_id} 的视频文案")
-        return jsonify({"success": False, "message": "未找到视频文案", "script": ""})
-    
-    logger.info(f"成功获取视频文案，长度: {len(video_script)}")
-    return jsonify({"success": True, "message": "获取成功", "script": video_script})
+    try:
+        # 从数据库中获取视频文案
+        video_script = analysis_db.get_video_script(report_id)
+        
+        if not video_script:
+            return jsonify({"success": False, "message": "未找到视频文案"})
+        
+        logger.info(f"成功获取视频文案，长度: {len(video_script)}")
+        return jsonify({"success": True, "message": "获取成功", "script": video_script})
+    except Exception as e:
+        logger.error(f"获取视频文案时出错: {str(e)}")
+        return jsonify({"success": False, "message": f"获取视频文案时出错: {str(e)}"})
+
+@app.route('/video_scripts')
+def video_scripts_page():
+    """显示所有视频脚本页面"""
+    try:
+        # 从数据库获取所有视频脚本
+        scripts = analysis_db.get_all_video_scripts()
+        
+        # 渲染视频脚本页面
+        return render_template('video_scripts.html', scripts=scripts)
+    except Exception as e:
+        logger.error(f"加载视频脚本页面时出错: {str(e)}")
+        return render_template('error.html', error=str(e))
+
+@app.route('/api/video_scripts')
+def get_all_video_scripts():
+    """API端点：获取所有视频脚本"""
+    try:
+        scripts = analysis_db.get_all_video_scripts()
+        return jsonify({"success": True, "scripts": scripts})
+    except Exception as e:
+        logger.error(f"获取所有视频脚本时出错: {str(e)}")
+        return jsonify({"success": False, "message": str(e)})
 
 if __name__ == '__main__':
     # 初始化应用
