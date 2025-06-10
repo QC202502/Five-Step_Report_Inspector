@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 显示加载状态
             videoScriptContent.textContent = "正在加载文案内容...";
             videoScriptModal.show();
-            
+                
             // 从API获取视频文案
             fetch(`/get_video_script/{{ report.id }}`)
                 .then(response => response.json())
@@ -748,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <i class="fas fa-exclamation-circle me-2"></i> 
                             尚未生成视频文案，请点击"生成视频文案"按钮。
                         </div>`;
-                    }
+                }
                 })
                 .catch(error => {
                     videoScriptContent.innerHTML = `<div class="alert alert-danger">
@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>`;
                 });
         });
-        
+            
         // 复制文案按钮
         const copyScriptBtn = document.getElementById('copyScriptBtn');
         if (copyScriptBtn) {
@@ -967,4 +967,77 @@ document.addEventListener('DOMContentLoaded', function() {
     color: white;
 }
 </style>
+
+<!-- 添加用于记录阅读时长的JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 页面加载时记录开始时间
+    var startTime = new Date();
+    var reportId = "{{ report.id }}";
+    var readDuration = 0;
+    var updateInterval;
+    
+    // 初始记录（5秒后记录一次，确保短时间浏览也能捕获）
+    setTimeout(function() {
+        var currentTime = new Date();
+        readDuration = Math.floor((currentTime - startTime) / 1000); // 转换为秒
+        console.log("初始阅读时长记录: " + readDuration + "秒");
+        
+        // 发送AJAX请求更新阅读时长
+        updateReadingDuration(readDuration);
+    }, 5000); // 5秒后记录一次
+    
+    // 定期更新阅读时长（每30秒更新一次）
+    updateInterval = setInterval(function() {
+        var currentTime = new Date();
+        readDuration = Math.floor((currentTime - startTime) / 1000); // 转换为秒
+        console.log("更新阅读时长: " + readDuration + "秒");
+        
+        // 发送AJAX请求更新阅读时长
+        updateReadingDuration(readDuration);
+    }, 30000); // 每30秒更新一次
+    
+    // 页面关闭或离开时更新阅读记录
+    window.addEventListener('beforeunload', function() {
+        clearInterval(updateInterval);
+        var endTime = new Date();
+        readDuration = Math.floor((endTime - startTime) / 1000); // 转换为秒
+        
+        // 发送同步请求，确保在页面关闭前完成
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/update_reading_duration/' + reportId, false); // 同步请求
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({
+            duration: readDuration,
+            is_completed: true
+        }));
+    });
+    
+    // 异步更新阅读时长的函数
+    function updateReadingDuration(duration) {
+        fetch('/update_reading_duration/' + reportId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                duration: duration,
+                is_completed: false // 定期更新时不标记为已完成
+            })
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            }
+            throw new Error('Network response was not ok');
+        })
+        .then(data => {
+            console.log('成功更新阅读时长:', data);
+        })
+        .catch(error => {
+            console.error('更新阅读时长失败:', error);
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -180,6 +180,36 @@
                         </button>
                     </div>
                 </form>
+                
+                <!-- 用户菜单 -->
+                <ul class="navbar-nav ms-2">
+                    {% if session.user %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-1"></i>{{ session.user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-id-card me-2"></i>个人资料</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('user_preferences') }}"><i class="fas fa-cog me-2"></i>用户设置</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('recommendation_settings') }}"><i class="fas fa-star me-2"></i>推荐设置</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('reading_history') }}"><i class="fas fa-history me-2"></i>阅读历史</a></li>
+                            {% if session.user.is_admin %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_users') }}"><i class="fas fa-users-cog me-2"></i>用户管理</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>退出登录</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}"><i class="fas fa-sign-in-alt me-1"></i>登录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}"><i class="fas fa-user-plus me-1"></i>注册</a>
+                    </li>
+                    {% endif %}
+                </ul>
             </div>
         </div>
     </nav>

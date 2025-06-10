@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}个人资料 - 五步法研报分析器{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">个人资料</h4>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    {% if profile.avatar_url %}
+                    <img src="{{ profile.avatar_url }}" alt="{{ profile.display_name }}" class="rounded-circle img-thumbnail" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                    <div class="avatar-placeholder rounded-circle mx-auto d-flex align-items-center justify-content-center bg-light" style="width: 150px; height: 150px;">
+                        <span class="display-4 text-muted">{{ profile.display_name[0] | upper }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <h3 class="card-title">{{ profile.display_name }}</h3>
+                <p class="text-muted">@{{ profile.username }}</p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('edit_profile') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit me-2"></i>编辑资料
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">账户信息</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>邮箱</span>
+                        <span>{{ profile.email }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>注册时间</span>
+                        <span>{{ profile.created_at }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>最后登录</span>
+                        <span>{{ profile.last_login or '未知' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>账户类型</span>
+                        <span>{% if profile.is_admin %}<span class="badge bg-danger">管理员</span>{% else %}<span class="badge bg-primary">普通用户</span>{% endif %}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">个人简介</h5>
+            </div>
+            <div class="card-body">
+                {% if profile.bio %}
+                <p>{{ profile.bio }}</p>
+                {% else %}
+                <p class="text-muted">暂无个人简介</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">偏好行业</h5>
+            </div>
+            <div class="card-body">
+                {% if profile.preferred_industries %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for industry in profile.preferred_industries %}
+                    <span class="badge bg-info">{{ industry }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">未设置偏好行业</p>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('recommendation_settings') }}" class="btn btn-sm btn-outline-warning">
+                    <i class="fas fa-cog me-1"></i> 调整推荐设置
+                </a>
+            </div>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">快速操作</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-home me-1"></i> 返回首页
+                    </a>
+                    <a href="{{ url_for('user_preferences') }}" class="btn btn-outline-info">
+                        <i class="fas fa-cog me-1"></i> 用户设置
+                    </a>
+                    <a href="{{ url_for('recommendation_settings') }}" class="btn btn-outline-success">
+                        <i class="fas fa-star me-1"></i> 推荐设置
+                    </a>
+                    {% if profile.is_admin %}
+                    <a href="{{ url_for('admin_users') }}" class="btn btn-outline-danger">
+                        <i class="fas fa-users-cog me-1"></i> 用户管理
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-sign-out-alt me-1"></i> 退出登录
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

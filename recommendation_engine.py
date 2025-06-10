@@ -93,7 +93,7 @@ class RecommendationEngine:
         return 30  # 不匹配偏好行业
     
     def get_recommendations(self, user_id=1, limit=5):
-        """获取推荐研报列表"""
+        """获取推荐研报列表，考虑用户阅读历史"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -109,13 +109,56 @@ class RecommendationEngine:
         # 获取用户设置
         settings = self.get_user_settings(user_id)
         
-        # 检查read_records表是否存在
+        # 检查用户偏好设置表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
+        user_preferences_exists = cursor.fetchone() is not None
+        
+        # 检查阅读历史表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reading_history'")
+        reading_history_exists = cursor.fetchone() is not None
+        
+        # 检查旧的read_records表是否存在
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='read_records'")
         read_records_exists = cursor.fetchone() is not None
         
+        # 获取用户阅读历史中的行业偏好
+        industry_preferences = settings['preferred_industries']
+        
+        # 如果存在阅读历史表，分析用户的阅读偏好
+        if reading_history_exists:
+            # 获取用户最近阅读的行业分布
+            cursor.execute('''
+            SELECT r.industry, COUNT(*) as count
+            FROM reading_history h
+            JOIN reports r ON h.report_id = r.id
+            WHERE h.user_id = ? AND r.industry IS NOT NULL AND r.industry != ''
+            GROUP BY r.industry
+            ORDER BY count DESC
+            LIMIT 5
+            ''', (user_id,))
+            
+            read_industries = cursor.fetchall()
+            
+            # 将用户经常阅读的行业添加到偏好中
+            for row in read_industries:
+                industry = row['industry']
+                if industry and industry not in industry_preferences:
+                    industry_preferences.append(industry)
+        
         # 构建SQL查询
-        if read_records_exists:
-            # 获取所有未读研报
+        # 优先获取未读研报
+        if reading_history_exists:
+            query = '''
+            SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
+                   r.content_preview, a.completeness_score
+            FROM reports r
+            LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
+            LEFT JOIN reading_history h ON r.id = h.report_id AND h.user_id = ?
+            WHERE h.id IS NULL  -- 未读研报
+            '''
+            params = (user_id,)
+        elif read_records_exists:
+            # 兼容旧版的read_records表
             query = '''
             SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
                    r.content_preview, a.completeness_score
@@ -126,7 +169,7 @@ class RecommendationEngine:
             '''
             params = (user_id,)
         else:
-            # 如果read_records表不存在，获取所有研报
+            # 如果没有阅读历史表，获取所有研报
             query = '''
             SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
                    r.content_preview, a.completeness_score
@@ -134,7 +177,7 @@ class RecommendationEngine:
             LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
             '''
             params = ()
-            print("警告: read_records表不存在，将显示所有研报")
+            print("警告: 阅读历史表不存在，将显示所有研报")
         
         cursor.execute(query, params)
         
@@ -151,14 +194,41 @@ class RecommendationEngine:
             # 计算行业匹配分数 (0-100)
             industry_score = self.calculate_industry_score(
                 report['industry'], 
-                settings['preferred_industries']
+                industry_preferences
             )
             
-            # 计算总推荐分数
+            # 计算阅读历史相关性分数
+            history_score = 50  # 默认中等分数
+            
+            # 如果存在阅读历史，分析相关性
+            if reading_history_exists:
+                # 获取用户阅读过的相似研报数量
+                if report['industry']:
+                    cursor.execute('''
+                    SELECT COUNT(*) as count
+                    FROM reading_history h
+                    JOIN reports r ON h.report_id = r.id
+                    WHERE h.user_id = ? AND r.industry = ?
+                    ''', (user_id, report['industry']))
+                    
+                    similar_count = cursor.fetchone()['count']
+                    
+                    # 根据相似研报阅读量调整分数
+                    if similar_count > 10:
+                        history_score = 100  # 用户非常喜欢这个行业
+                    elif similar_count > 5:
+                        history_score = 85  # 用户比较喜欢这个行业
+                    elif similar_count > 2:
+                        history_score = 70  # 用户有一定兴趣
+                    elif similar_count > 0:
+                        history_score = 60  # 用户略有兴趣
+            
+            # 计算总推荐分数，加入历史相关性因素
             recommendation_score = (
                 (analysis_score * settings['weight_score'] / 100) +
                 (time_score * settings['weight_time'] / 100) +
-                (industry_score * settings['weight_industry'] / 100)
+                (industry_score * settings['weight_industry'] / 100) +
+                (history_score * 0.2)  # 历史相关性额外加权20%
             )
             
             report['recommendation_score'] = round(recommendation_score, 2)
@@ -173,12 +243,12 @@ class RecommendationEngine:
         return reports[:limit]
     
     def mark_as_read(self, report_id, user_id=1, status='read'):
-        """标记研报为已读"""
+        """标记研报为已读，同时更新阅读历史"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            # 检查表是否存在
+            # 检查旧的read_records表是否存在
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='read_records'")
             if not cursor.fetchone():
                 # 如果表不存在，创建表
@@ -195,10 +265,71 @@ class RecommendationEngine:
                 ''')
                 print("已创建read_records表")
             
+            # 更新旧的read_records表
             cursor.execute('''
             INSERT OR REPLACE INTO read_records (user_id, report_id, read_status, read_at)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             ''', (user_id, report_id, status))
+            
+            # 检查新的reading_history表是否存在
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reading_history'")
+            if cursor.fetchone():
+                # 检查用户的隐私设置是否允许收集阅读历史
+                collect_history = True
+                
+                # 检查user_preferences表是否存在
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
+                if cursor.fetchone():
+                    # 获取用户隐私设置
+                    cursor.execute('''
+                    SELECT preference_data FROM user_preferences 
+                    WHERE user_id = ? AND preference_type = 'privacy'
+                    ''', (user_id,))
+                    
+                    privacy_data = cursor.fetchone()
+                    if privacy_data:
+                        try:
+                            import json
+                            privacy_settings = json.loads(privacy_data[0])
+                            collect_history = privacy_settings.get('collect_reading_history', True)
+                        except:
+                            pass
+                
+                # 如果用户允许收集阅读历史，则更新reading_history表
+                if collect_history:
+                    # 检查是否已有记录
+                    cursor.execute('''
+                    SELECT id, read_duration, is_completed FROM reading_history 
+                    WHERE user_id = ? AND report_id = ?
+                    ''', (user_id, report_id))
+                    
+                    existing = cursor.fetchone()
+                    
+                    if existing:
+                        # 更新现有记录
+                        is_completed = 1 if status == 'read' else 0
+                        
+                        # 更新阅读时间、完成状态和阅读时长（如果当前时长为0）
+                        if existing[1] == 0:  # 如果当前阅读时长为0
+                            read_duration = 180  # 设置默认阅读时长为3分钟
+                        else:
+                            read_duration = existing[1]  # 保持原有阅读时长
+                            
+                        cursor.execute('''
+                        UPDATE reading_history 
+                        SET read_at = CURRENT_TIMESTAMP, 
+                            is_completed = ?,
+                            read_duration = ?
+                        WHERE id = ?
+                        ''', (is_completed, read_duration, existing[0]))
+                    else:
+                        # 插入新记录
+                        is_completed = 1 if status == 'read' else 0
+                        
+                        cursor.execute('''
+                        INSERT INTO reading_history (user_id, report_id, read_duration, is_completed)
+                        VALUES (?, ?, ?, ?)
+                        ''', (user_id, report_id, 0, is_completed))
             
             conn.commit()
             success = True
@@ -289,22 +420,34 @@ class RecommendationEngine:
         return success
     
     def check_is_read(self, report_id, user_id=1):
-        """检查研报是否已读"""
+        """检查研报是否已读，同时检查新旧两个表"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 检查表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='read_records'")
-        if not cursor.fetchone():
-            conn.close()
-            return False
+        is_read = False
+        
+        # 检查新的reading_history表
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reading_history'")
+        if cursor.fetchone():
+            cursor.execute('''
+            SELECT id FROM reading_history 
+            WHERE user_id = ? AND report_id = ?
+            ''', (user_id, report_id))
             
-        cursor.execute('''
-        SELECT id FROM read_records 
-        WHERE user_id = ? AND report_id = ?
-        ''', (user_id, report_id))
+            if cursor.fetchone():
+                is_read = True
         
-        result = cursor.fetchone()
+        # 如果新表中没有找到记录，检查旧的read_records表
+        if not is_read:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='read_records'")
+            if cursor.fetchone():
+                cursor.execute('''
+                SELECT id FROM read_records 
+                WHERE user_id = ? AND report_id = ?
+                ''', (user_id, report_id))
+                
+                if cursor.fetchone():
+                    is_read = True
+        
         conn.close()
-        
-        return result is not None 
+        return is_read

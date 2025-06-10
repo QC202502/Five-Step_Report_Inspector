@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, jsonify, request, redirect, url_for, abort, flash, Markup
+from flask import Flask, render_template, jsonify, request, redirect, url_for, abort, flash, Markup, session
 import json
 import os
 import sys
@@ -14,13 +14,22 @@ from database import get_db_connection, get_reports_from_db
 import threading
 from analysis_db import AnalysisDatabase
 from recommendation_engine import RecommendationEngine
+from user_manager import UserManager, login_required, admin_required
 
 # 创建Flask应用
 app = Flask(__name__)
 app.secret_key = 'five_step_report_inspector_secret_key'  # 设置密钥
+app.permanent_session_lifetime = datetime.timedelta(days=30)  # 会话有效期
 
 # 创建分析数据库实例
 analysis_db = AnalysisDatabase()
+
+# 创建用户管理器实例
+user_manager = UserManager()
+
+# 创建偏好设置管理器实例
+from preference_manager import PreferenceManager
+preference_manager = PreferenceManager()
 
 # 添加nl2br过滤器，用于在HTML中显示换行
 @app.template_filter('nl2br')
@@ -35,12 +44,174 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # 版本常量
-VERSION = "0.5.0"
+VERSION = "0.7.2"
 # 数据库路径
 DATABASE_PATH = 'research_reports.db'
 
 # 全局变量，存储爬取状态
 scraping_status = {"is_scraping": False, "message": ""}
+
+# 用户认证相关路由
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """用户登录页面"""
+    # 如果用户已登录，重定向到首页
+    if 'user' in session:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember') == 'on'
+        
+        if not username or not password:
+            flash('请输入用户名和密码', 'danger')
+            return render_template('login.html')
+            
+        success, result = user_manager.login(username, password, remember)
+        
+        if success:
+            # 设置会话
+            session['user'] = {
+                'id': result['id'],
+                'username': result['username'],
+                'is_admin': result['is_admin']
+            }
+            session['session_token'] = result['session_token']
+            
+            if remember:
+                session.permanent = True
+                
+            next_url = request.args.get('next') or url_for('index')
+            flash(f'欢迎回来, {result["username"]}!', 'success')
+            return redirect(next_url)
+        else:
+            flash(result, 'danger')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    """用户登出"""
+    if 'session_token' in session:
+        user_manager.logout(session['session_token'])
+    
+    # 清除会话
+    session.pop('user', None)
+    session.pop('session_token', None)
+    flash('您已成功登出', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """用户注册页面"""
+    # 如果用户已登录，重定向到首页
+    if 'user' in session:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        success, message = user_manager.register_user(
+            username, email, password, confirm_password
+        )
+        
+        if success:
+            flash('注册成功，请登录', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash(message, 'danger')
+    
+    return render_template('register.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    """用户资料页面"""
+    user_id = session['user']['id']
+    user_profile = user_manager.get_user_profile(user_id)
+    
+    if not user_profile:
+        flash('获取用户资料失败', 'danger')
+        return redirect(url_for('index'))
+        
+    return render_template('profile.html', profile=user_profile)
+
+@app.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """编辑用户资料"""
+    user_id = session['user']['id']
+    
+    if request.method == 'POST':
+        profile_data = {
+            'display_name': request.form.get('display_name'),
+            'email': request.form.get('email'),
+            'bio': request.form.get('bio')
+        }
+        
+        # 处理密码更新
+        if request.form.get('new_password'):
+            profile_data.update({
+                'current_password': request.form.get('current_password'),
+                'new_password': request.form.get('new_password')
+            })
+        
+        # 处理偏好行业
+        if 'preferred_industries' in request.form:
+            profile_data['preferred_industries'] = request.form.get('preferred_industries').split(',')
+        
+        success, message = user_manager.update_profile(user_id, profile_data)
+        
+        if success:
+            flash('资料更新成功', 'success')
+            return redirect(url_for('profile'))
+        else:
+            flash(message, 'danger')
+    
+    # 获取当前资料
+    user_profile = user_manager.get_user_profile(user_id)
+    
+    if not user_profile:
+        flash('获取用户资料失败', 'danger')
+        return redirect(url_for('index'))
+        
+    # 获取所有可用行业
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != ""')
+    all_industries = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    return render_template('edit_profile.html', profile=user_profile, all_industries=all_industries)
+
+# 管理员路由
+@app.route('/admin/users')
+@admin_required
+def admin_users():
+    """用户管理页面（管理员）"""
+    page = request.args.get('page', 1, type=int)
+    result = user_manager.list_users(page=page)
+    
+    return render_template('admin_users.html', users=result)
+
+@app.route('/admin/user/<int:user_id>/toggle_status', methods=['POST'])
+@admin_required
+def toggle_user_status(user_id):
+    """切换用户状态（激活/禁用）"""
+    is_active = request.form.get('is_active') == 'true'
+    success = user_manager.change_user_status(user_id, is_active)
+    
+    if success:
+        status = "激活" if is_active else "禁用"
+        flash(f'用户已{status}', 'success')
+    else:
+        flash('操作失败', 'danger')
+        
+    return redirect(url_for('admin_users'))
 
 # 检查端口是否可用
 def is_port_available(port):
@@ -88,12 +259,15 @@ recommendation_engine = RecommendationEngine()
 @app.route('/')
 def index():
     """首页"""
+    # 获取当前用户ID
+    user_id = session.get('user', {}).get('id', 1)
+    
     # 获取推荐研报
-    recommendations = recommendation_engine.get_recommendations(limit=5)
+    recommendations = recommendation_engine.get_recommendations(user_id=user_id, limit=5)
     
     # 为每个推荐研报添加已读状态
     for report in recommendations:
-        report['is_read'] = recommendation_engine.check_is_read(report['id'])
+        report['is_read'] = recommendation_engine.check_is_read(report['id'], user_id=user_id)
     
     # 获取所有研报
     reports = load_reports_from_db()
@@ -128,16 +302,33 @@ def report_detail(report_id):
     # 将行对象转换为字典
     report_dict = dict(report)
     
+    # 获取当前用户ID
+    user_id = session.get('user', {}).get('id', 1)
+    
     # 检查研报是否已读
-    report_dict['is_read'] = recommendation_engine.check_is_read(report_id)
+    report_dict['is_read'] = recommendation_engine.check_is_read(report_id, user_id=user_id)
+    
+    # 如果用户已登录，自动将研报标记为已读
+    if 'user' in session:
+        # 检查用户偏好设置中是否启用了自动标记已读
+        auto_mark_read = True  # 默认启用
+        user_preferences = preference_manager.get_user_preferences(user_id, 'recommendation')
+        if user_preferences:
+            auto_mark_read = user_preferences.get('auto_mark_read', True)
+            
+        # 如果启用了自动标记已读，且研报尚未标记为已读
+        if auto_mark_read:
+            if not report_dict['is_read']:
+                # 首次阅读，标记为已读
+                recommendation_engine.mark_as_read(report_id, user_id=user_id)
+            # 注意：不再在这里设置默认阅读时长，改为由前端JS实际记录阅读时长
     
     # 获取分析结果
     analysis_db = AnalysisDatabase()
-    claude_analysis = analysis_db.get_analysis_by_report_id(report_id, analyzer_type='claude')
     deepseek_analysis = analysis_db.get_analysis_by_report_id(report_id, analyzer_type='deepseek')
     
     # 如果没有分析结果，创建默认占位结果以避免前端错误
-    if not claude_analysis and not deepseek_analysis:
+    if not deepseek_analysis:
         # 记录缺少分析结果的情况，但不在页面上显示错误
         logger.info(f"研报ID {report_id} 没有找到分析结果，将使用占位数据")
         
@@ -161,16 +352,12 @@ def report_detail(report_id):
             'improvement_suggestions': []
         }
         
-        # 根据需要设置分析结果
-        if not claude_analysis:
-            claude_analysis = default_analysis
-        if not deepseek_analysis:
-            deepseek_analysis = default_analysis
+        # 设置分析结果
+        deepseek_analysis = default_analysis
     
     return render_template(
         'report_detail.html', 
         report=report_dict,
-        claude_analysis=claude_analysis,
         deepseek_analysis=deepseek_analysis
     )
 
@@ -783,9 +970,11 @@ def get_all_video_scripts():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/mark_read/<int:report_id>')
+@login_required
 def mark_read(report_id):
     """标记研报为已读"""
-    success = recommendation_engine.mark_as_read(report_id)
+    user_id = session['user']['id']
+    success = recommendation_engine.mark_as_read(report_id, user_id=user_id)
     if success:
         flash('已标记为已读', 'success')
     else:
@@ -793,9 +982,11 @@ def mark_read(report_id):
     return redirect(url_for('report_detail', report_id=report_id))
 
 @app.route('/mark_not_interested/<int:report_id>')
+@login_required
 def mark_not_interested(report_id):
     """标记为不感兴趣"""
-    success = recommendation_engine.mark_as_read(report_id, status='not_interested')
+    user_id = session['user']['id']
+    success = recommendation_engine.mark_as_read(report_id, user_id=user_id, status='not_interested')
     if success:
         flash('已标记为不感兴趣', 'success')
     else:
@@ -803,11 +994,15 @@ def mark_not_interested(report_id):
     return redirect(url_for('index'))
 
 @app.route('/recommendation_settings', methods=['GET', 'POST'])
+@login_required
 def recommendation_settings():
     """推荐设置页面"""
+    user_id = session['user']['id']
+    
     if request.method == 'POST':
         # 更新推荐设置
         settings = {
+            'user_id': user_id,
             'weight_score': int(request.form.get('weight_score', 40)),
             'weight_time': int(request.form.get('weight_time', 30)),
             'weight_industry': int(request.form.get('weight_industry', 30)),
@@ -822,7 +1017,7 @@ def recommendation_settings():
             flash('更新设置失败', 'error')
             
     # 获取当前设置
-    current_settings = recommendation_engine.get_user_settings()
+    current_settings = recommendation_engine.get_user_settings(user_id=user_id)
     
     # 获取所有可用行业
     conn = sqlite3.connect(DATABASE_PATH)
@@ -834,6 +1029,353 @@ def recommendation_settings():
     return render_template('recommendation_settings.html', 
                           settings=current_settings,
                           all_industries=all_industries)
+
+@app.route('/user/preferences', methods=['GET', 'POST'])
+@login_required
+def user_preferences():
+    """用户偏好设置页面"""
+    user_id = session['user']['id']
+    
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+        
+        if form_type == 'recommendation':
+            # 处理推荐设置
+            preferences = {
+                'weight_score': int(request.form.get('weight_score', 40)),
+                'weight_time': int(request.form.get('weight_time', 30)),
+                'weight_industry': int(request.form.get('weight_industry', 30)),
+                'preferred_industries': request.form.get('preferred_industries', '').split(',') if request.form.get('preferred_industries') else [],
+                'show_recommendations': request.form.get('show_recommendations') == 'on',
+                'show_recommendation_modal': request.form.get('show_recommendation_modal') == 'on',
+                'auto_mark_read': request.form.get('auto_mark_read') == 'on'
+            }
+            
+            success, message = preference_manager.update_user_preferences(user_id, 'recommendation', preferences)
+            
+        elif form_type == 'notification':
+            # 处理通知设置
+            settings = {
+                'email': request.form.get('email_notifications') == 'on',
+                'site': request.form.get('site_notifications') == 'on',
+                'new_reports': request.form.get('notify_new_reports') == 'on',
+                'industry_reports': request.form.get('notify_industry_reports') == 'on',
+                'high_quality': request.form.get('notify_high_quality') == 'on'
+            }
+            
+            success, message = preference_manager.update_notification_settings(user_id, settings)
+            
+        elif form_type == 'reading':
+            # 处理阅读偏好
+            preferences = {
+                'default_view': request.form.get('default_view', 'card'),
+                'reports_per_page': int(request.form.get('reports_per_page', 20)),
+                'default_sort': request.form.get('default_sort', 'date'),
+                'sort_desc': request.form.get('sort_desc') == 'on',
+                'auto_expand_summary': request.form.get('auto_expand_summary') == 'on',
+                'auto_expand_analysis': request.form.get('auto_expand_analysis') == 'on'
+            }
+            
+            success, message = preference_manager.update_user_preferences(user_id, 'reading', preferences)
+            
+        elif form_type == 'privacy':
+            # 处理隐私设置
+            preferences = {
+                'collect_reading_history': request.form.get('collect_reading_history') == 'on',
+                'collect_search_history': request.form.get('collect_search_history') == 'on',
+                'show_profile': request.form.get('show_profile') == 'on',
+                'show_reading_history': request.form.get('show_reading_history') == 'on'
+            }
+            
+            success, message = preference_manager.update_user_preferences(user_id, 'privacy', preferences)
+            
+        else:
+            success = False
+            message = "未知的设置类型"
+        
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'danger')
+        
+        # 重定向到当前页面，但添加标签页参数
+        return redirect(url_for('user_preferences', tab=form_type))
+    
+    # 获取用户的所有偏好设置
+    settings = preference_manager.get_user_preferences(user_id, 'recommendation')
+    reading_preferences = preference_manager.get_user_preferences(user_id, 'reading')
+    privacy_settings = preference_manager.get_user_preferences(user_id, 'privacy')
+    notification_settings = preference_manager.get_notification_settings(user_id)
+    
+    # 获取用户偏好
+    user_preferences = {
+        'show_recommendations': settings.get('show_recommendations', True),
+        'show_recommendation_modal': settings.get('show_recommendation_modal', True),
+        'auto_mark_read': settings.get('auto_mark_read', True)
+    }
+    
+    # 获取所有可用行业
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != ""')
+    all_industries = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    return render_template('preferences.html', 
+                          settings=settings,
+                          reading_preferences=reading_preferences,
+                          privacy_settings=privacy_settings,
+                          notification_settings=notification_settings,
+                          user_preferences=user_preferences,
+                          all_industries=all_industries)
+
+@app.route('/user/reading_history')
+@login_required
+def reading_history():
+    """用户阅读历史页面"""
+    user_id = session['user']['id']
+    
+    # 获取分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    # 获取排序和筛选参数
+    sort = request.args.get('sort', 'recent')
+    filter_type = request.args.get('filter', 'all')
+    
+    # 计算偏移量
+    offset = (page - 1) * per_page
+    
+    # 构建查询参数
+    params = {'user_id': user_id, 'limit': per_page, 'offset': offset}
+    
+    # 获取阅读历史
+    history = preference_manager.get_reading_history(
+        user_id=user_id,
+        limit=per_page,
+        offset=offset,
+        sort_by=sort,
+        filter_by=filter_type
+    )
+    
+    # 获取总记录数
+    total_records = preference_manager.get_reading_history_count(user_id, filter_by=filter_type)
+    
+    # 计算总页数
+    total_pages = (total_records + per_page - 1) // per_page
+    
+    return render_template('reading_history.html',
+                          history=history,
+                          page=page,
+                          total_pages=total_pages,
+                          sort=sort,
+                          filter=filter_type)
+
+@app.route('/user/clear_reading_history', methods=['POST'])
+@login_required
+def clear_reading_history():
+    """清除用户阅读历史"""
+    user_id = session['user']['id']
+    success, message = preference_manager.clear_reading_history(user_id)
+    
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'danger')
+    
+    # 检查请求来源
+    referer = request.referrer
+    if referer and 'reading_history' in referer:
+        return redirect(url_for('reading_history'))
+    else:
+        return redirect(url_for('user_preferences', tab='data-settings'))
+
+@app.route('/user/clear_search_history', methods=['POST'])
+@login_required
+def clear_search_history():
+    """清除用户搜索历史"""
+    user_id = session['user']['id']
+    success, message = preference_manager.clear_search_history(user_id)
+    
+    if success:
+        flash(message, 'success')
+    else:
+        flash(message, 'danger')
+        
+    return redirect(url_for('user_preferences', tab='data-settings'))
+
+@app.route('/user/export_data')
+@login_required
+def export_user_data():
+    """导出用户数据"""
+    user_id = session['user']['id']
+    data = preference_manager.export_user_data(user_id)
+    
+    # 将数据转换为JSON并作为下载文件返回
+    from flask import Response
+    
+    username = session['user']['username']
+    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"{username}_data_export_{timestamp}.json"
+    
+    return Response(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+@app.route('/user/export_reading_history')
+@login_required
+def export_reading_history():
+    """导出用户阅读历史，支持CSV和JSON格式"""
+    user_id = session['user']['id']
+    format_type = request.args.get('format', 'csv')  # 默认为CSV格式
+    
+    # 获取用户名和时间戳
+    username = session['user']['username']
+    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    
+    # 获取阅读历史
+    history = preference_manager.get_reading_history(
+        user_id=user_id,
+        limit=1000,  # 设置一个较大的限制
+        offset=0,
+        sort_by='recent'
+    )
+    
+    if not history:
+        flash('没有阅读历史记录可导出', 'info')
+        return redirect(url_for('reading_history'))
+    
+    from flask import Response
+    import io
+    import csv
+    
+    if format_type == 'csv':
+        # 准备CSV数据
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # 写入CSV头部
+        writer.writerow(['报告标题', '行业', '阅读时间', '阅读时长(秒)', '状态', '报告ID'])
+        
+        # 写入数据行
+        for item in history:
+            status = '已完成' if item['is_completed'] else '未完成'
+            writer.writerow([
+                item['title'],
+                item['industry'],
+                item['read_at'],
+                item['read_duration'],
+                status,
+                item['report_id']
+            ])
+        
+        # 创建响应
+        output.seek(0)
+        filename = f"{username}_reading_history_{timestamp}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv; charset=utf-8',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    else:
+        # JSON格式
+        filename = f"{username}_reading_history_{timestamp}.json"
+        return Response(
+            json.dumps(history, ensure_ascii=False, indent=2),
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+
+@app.route('/user/delete_account', methods=['POST'])
+@login_required
+def delete_account():
+    """删除用户账户"""
+    user_id = session['user']['id']
+    password = request.form.get('password')
+    confirm_delete = request.form.get('confirm_delete') == 'on'
+    
+    if not confirm_delete:
+        flash('请确认您要删除账户', 'danger')
+        return redirect(url_for('user_preferences', tab='data-settings'))
+    
+    # 验证密码
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT password_hash, salt FROM users WHERE id = ?', (user_id,))
+    user_data = cursor.fetchone()
+    conn.close()
+    
+    if not user_data:
+        flash('用户不存在', 'danger')
+        return redirect(url_for('user_preferences', tab='data-settings'))
+    
+    import hashlib
+    password_hash = hashlib.sha256((password + user_data['salt']).encode()).hexdigest()
+    
+    if password_hash != user_data['password_hash']:
+        flash('密码不正确', 'danger')
+        return redirect(url_for('user_preferences', tab='data-settings'))
+    
+    # 删除用户数据
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 开始事务
+        cursor.execute('BEGIN TRANSACTION')
+        
+        # 删除用户相关数据
+        cursor.execute('DELETE FROM reading_history WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM search_history WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM user_preferences WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM user_profiles WHERE user_id = ?', (user_id,))
+        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        
+        # 提交事务
+        cursor.execute('COMMIT')
+        
+        # 清除会话
+        session.pop('user', None)
+        session.pop('session_token', None)
+        
+        flash('您的账户已成功删除', 'success')
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        cursor.execute('ROLLBACK')
+        flash(f'删除账户失败: {str(e)}', 'danger')
+        return redirect(url_for('user_preferences', tab='data-settings'))
+    finally:
+        conn.close()
+
+@app.route('/update_reading_duration/<int:report_id>', methods=['POST'])
+@login_required
+def update_reading_duration(report_id):
+    """更新研报阅读时长"""
+    user_id = session['user']['id']
+    
+    # 从请求中获取阅读时长和完成状态
+    data = request.json
+    duration = data.get('duration', 0)
+    is_completed = data.get('is_completed', False)
+    
+    print(f"接收到阅读时长更新请求: 用户={user_id}, 报告={report_id}, 时长={duration}秒, 完成={is_completed}")
+    
+    # 使用preference_manager更新阅读记录
+    success = preference_manager.record_reading_history(
+        user_id=user_id,
+        report_id=report_id,
+        duration=duration,
+        is_completed=is_completed
+    )
+    
+    if success:
+        return jsonify({"success": True, "duration": duration})
+    else:
+        return jsonify({"success": False, "message": "Failed to update reading duration"}), 500
 
 if __name__ == '__main__':
     # 初始化应用

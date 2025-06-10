@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}用户偏好设置 - 五步法研报分析器{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">用户偏好设置</h2>
+    
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">推荐设置</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('user_preferences') }}">
+                <input type="hidden" name="form_type" value="recommendation">
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">推荐因素权重</h6>
+                    <p class="text-muted">调整以下权重来影响研报推荐的排序方式（总和应为100）</p>
+                    
+                    <div class="mb-3">
+                        <label for="weight_score" class="form-label">五步法分析评分权重</label>
+                        <input type="range" class="form-range" min="0" max="100" step="5" 
+                               id="weight_score" name="weight_score" 
+                               value="{{ settings.weight_score }}"
+                               oninput="updateWeights()">
+                        <div class="d-flex justify-content-between">
+                            <span>0%</span>
+                            <span id="weight_score_value">{{ settings.weight_score }}%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="weight_time" class="form-label">时间新鲜度权重</label>
+                        <input type="range" class="form-range" min="0" max="100" step="5" 
+                               id="weight_time" name="weight_time" 
+                               value="{{ settings.weight_time }}"
+                               oninput="updateWeights()">
+                        <div class="d-flex justify-content-between">
+                            <span>0%</span>
+                            <span id="weight_time_value">{{ settings.weight_time }}%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="weight_industry" class="form-label">行业相关性权重</label>
+                        <input type="range" class="form-range" min="0" max="100" step="5" 
+                               id="weight_industry" name="weight_industry" 
+                               value="{{ settings.weight_industry }}"
+                               oninput="updateWeights()">
+                        <div class="d-flex justify-content-between">
+                            <span>0%</span>
+                            <span id="weight_industry_value">{{ settings.weight_industry }}%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info" id="weight_total_alert">
+                        权重总和: <span id="weight_total">100</span>%
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">偏好行业</h6>
+                    <p class="text-muted">选择您感兴趣的行业，这些行业的研报将获得更高的推荐优先级</p>
+                    
+                    <div class="mb-3">
+                        <select class="form-select" id="industry_selector" multiple>
+                            {% for industry in all_industries %}
+                            <option value="{{ industry }}" 
+                                    {% if industry in settings.preferred_industries %}selected{% endif %}>
+                                {{ industry }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <input type="hidden" name="preferred_industries" id="preferred_industries" 
+                               value="{{ ','.join(settings.preferred_industries) }}">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">推荐内容设置</h6>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="show_recommendations" name="show_recommendations" 
+                               {% if user_preferences.show_recommendations %}checked{% endif %}>
+                        <label class="form-check-label" for="show_recommendations">在首页显示推荐研报</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="show_recommendation_modal" name="show_recommendation_modal"
+                               {% if user_preferences.show_recommendation_modal %}checked{% endif %}>
+                        <label class="form-check-label" for="show_recommendation_modal">登录时显示推荐弹窗</label>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">保存设置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card shadow">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">隐私设置</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('user_preferences') }}">
+                <input type="hidden" name="form_type" value="privacy">
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">数据收集</h6>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="collect_reading_history" name="collect_reading_history"
+                               {% if privacy_settings.collect_reading_history %}checked{% endif %}>
+                        <label class="form-check-label" for="collect_reading_history">收集阅读历史（用于改进推荐）</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="collect_search_history" name="collect_search_history"
+                               {% if privacy_settings.collect_search_history %}checked{% endif %}>
+                        <label class="form-check-label" for="collect_search_history">收集搜索历史（用于改进搜索结果）</label>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> 您的邮箱和密码等敏感信息永远不会被公开或共享。
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-info text-white">保存隐私设置</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 推荐设置相关脚本
+    function updateWeights() {
+        // 获取各权重值
+        const scoreWeight = parseInt(document.getElementById('weight_score').value);
+        const timeWeight = parseInt(document.getElementById('weight_time').value);
+        const industryWeight = parseInt(document.getElementById('weight_industry').value);
+        
+        // 更新显示
+        document.getElementById('weight_score_value').textContent = scoreWeight + '%';
+        document.getElementById('weight_time_value').textContent = timeWeight + '%';
+        document.getElementById('weight_industry_value').textContent = industryWeight + '%';
+        
+        // 计算总和
+        const total = scoreWeight + timeWeight + industryWeight;
+        document.getElementById('weight_total').textContent = total;
+        
+        // 根据总和显示提示
+        const alertElement = document.getElementById('weight_total_alert');
+        if (total === 100) {
+            alertElement.className = 'alert alert-success';
+        } else {
+            alertElement.className = 'alert alert-danger';
+        }
+    }
+    
+    // 处理行业选择
+    document.getElementById('industry_selector').addEventListener('change', function() {
+        const selected = Array.from(this.selectedOptions).map(option => option.value);
+        document.getElementById('preferred_industries').value = selected.join(',');
+    });
+    
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        updateWeights();
+    });
+</script>
+{% endblock %} 
