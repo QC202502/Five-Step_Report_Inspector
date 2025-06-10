@@ -372,6 +372,48 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- 我的笔记 -->
+            <div class="card mt-4" id="my-notes-section">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sticky-note me-2"></i>我的笔记
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- 笔记列表 -->
+                    <div id="notes-list">
+                        {% if notes %}
+                            {% for note in notes %}
+                                <div class="note-item mb-3 p-3 border rounded" data-note-id="{{ note.id }}">
+                                    <div class="note-content">{{ note.note_content | nl2br }}</div>
+                                    <div class="text-muted small mt-2">
+                                        创建于: {{ note.created_at.split(' ')[0] }}
+                                        | 更新于: {{ note.updated_at.split(' ')[0] }}
+                                        <div class="float-end">
+                                            <button class="btn btn-sm btn-outline-primary edit-note-btn">编辑</button>
+                                            <button class="btn btn-sm btn-outline-danger delete-note-btn">删除</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p id="no-notes-message">还没有任何笔记，快来写下你的第一条笔记吧！</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- 新建/编辑笔记表单 -->
+                    <div class="mt-4">
+                        <h6 id="note-form-title">记录新笔记</h6>
+                        <textarea id="note-content-input" class="form-control" rows="4" placeholder="在此输入你的想法、疑问或总结..."></textarea>
+                        <div class="mt-2 text-end">
+                            <button id="save-note-btn" class="btn btn-primary">保存笔记</button>
+                            <button id="update-note-btn" class="btn btn-success" style="display:none;">更新笔记</button>
+                            <button id="cancel-edit-btn" class="btn btn-secondary" style="display:none;">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <!-- 右侧边栏 -->
@@ -777,6 +819,154 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             });
         }
+    }
+
+    // 笔记功能交互
+    const reportId = {{ report.id }};
+    const notesList = document.getElementById('notes-list');
+    const noNotesMessage = document.getElementById('no-notes-message');
+    const noteContentInput = document.getElementById('note-content-input');
+    const saveNoteBtn = document.getElementById('save-note-btn');
+    const updateNoteBtn = document.getElementById('update-note-btn');
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    const noteFormTitle = document.getElementById('note-form-title');
+
+    let editingNoteId = null;
+
+    // 渲染单条笔记
+    function renderNote(note) {
+        const noteItem = document.createElement('div');
+        noteItem.className = 'note-item mb-3 p-3 border rounded';
+        noteItem.dataset.noteId = note.id;
+        
+        noteItem.innerHTML = `
+            <div class="note-content">${note.note_content.replace(/\n/g, '<br>')}</div>
+            <div class="text-muted small mt-2">
+                创建于: ${note.created_at.split(' ')[0]}
+                | 更新于: ${note.updated_at.split(' ')[0]}
+                <div class="float-end">
+                    <button class="btn btn-sm btn-outline-primary edit-note-btn">编辑</button>
+                    <button class="btn btn-sm btn-outline-danger delete-note-btn">删除</button>
+                </div>
+            </div>
+        `;
+        return noteItem;
+    }
+
+    // 刷新笔记列表
+    async function refreshNotes() {
+        const response = await fetch(`/api/report/${reportId}/notes`);
+        const notes = await response.json();
+        notesList.innerHTML = ''; // 清空
+        if (notes.length > 0) {
+            if (noNotesMessage) noNotesMessage.style.display = 'none';
+            notes.forEach(note => {
+                notesList.appendChild(renderNote(note));
+            });
+        } else {
+            if (noNotesMessage) {
+                noNotesMessage.style.display = 'block';
+            } else {
+                const p = document.createElement('p');
+                p.id = 'no-notes-message';
+                p.textContent = '还没有任何笔记，快来写下你的第一条笔记吧！';
+                notesList.appendChild(p);
+            }
+        }
+    }
+
+    // 保存新笔记
+    saveNoteBtn.addEventListener('click', async () => {
+        const content = noteContentInput.value.trim();
+        if (!content) {
+            showToast('笔记内容不能为空', 'warning');
+            return;
+        }
+
+        const response = await fetch(`/api/report/${reportId}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note_content: content })
+        });
+
+        if (response.ok) {
+            noteContentInput.value = '';
+            showToast('笔记保存成功', 'success');
+            await refreshNotes();
+        } else {
+            showToast('保存失败，请稍后重试', 'danger');
+        }
+    });
+
+    // 处理编辑和删除事件
+    notesList.addEventListener('click', async (e) => {
+        const target = e.target;
+        const noteItem = target.closest('.note-item');
+        if (!noteItem) return;
+        const noteId = noteItem.dataset.noteId;
+
+        // 删除笔记
+        if (target.classList.contains('delete-note-btn')) {
+            if (confirm('确定要删除这条笔记吗？此操作不可撤销。')) {
+                const response = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    showToast('笔记已删除', 'success');
+                    await refreshNotes();
+                } else {
+                    showToast('删除失败', 'danger');
+                }
+            }
+        }
+
+        // 编辑笔记
+        if (target.classList.contains('edit-note-btn')) {
+            const contentDiv = noteItem.querySelector('.note-content');
+            noteContentInput.value = contentDiv.innerText; // 使用 innerText 获取纯文本内容
+            editingNoteId = noteId;
+
+            noteFormTitle.textContent = '编辑笔记';
+            saveNoteBtn.style.display = 'none';
+            updateNoteBtn.style.display = 'inline-block';
+            cancelEditBtn.style.display = 'inline-block';
+            noteContentInput.focus();
+        }
+    });
+
+    // 更新笔记
+    updateNoteBtn.addEventListener('click', async () => {
+        const content = noteContentInput.value.trim();
+        if (!content) {
+            showToast('笔记内容不能为空', 'warning');
+            return;
+        }
+
+        const response = await fetch(`/api/notes/${editingNoteId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note_content: content })
+        });
+
+        if (response.ok) {
+            showToast('笔记更新成功', 'success');
+            await refreshNotes();
+            resetNoteForm();
+        } else {
+            showToast('更新失败', 'danger');
+        }
+    });
+
+    // 取消编辑
+    cancelEditBtn.addEventListener('click', () => {
+        resetNoteForm();
+    });
+
+    function resetNoteForm() {
+        editingNoteId = null;
+        noteContentInput.value = '';
+        noteFormTitle.textContent = '记录新笔记';
+        saveNoteBtn.style.display = 'inline-block';
+        updateNoteBtn.style.display = 'none';
+        cancelEditBtn.style.display = 'none';
     }
 });
 </script>

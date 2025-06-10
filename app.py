@@ -12,6 +12,7 @@ import requests
 import logging
 from database import get_db_connection, get_reports_from_db
 import threading
+import importlib.util # 用于动态导入模块
 from analysis_db import AnalysisDatabase
 from recommendation_engine import RecommendationEngine
 from user_manager import UserManager, login_required, admin_required
@@ -355,10 +356,22 @@ def report_detail(report_id):
         # 设置分析结果
         deepseek_analysis = default_analysis
     
+    # 获取笔记
+    notes_conn = get_db_connection()
+    notes_cursor = notes_conn.cursor()
+    notes_cursor.execute('''
+        SELECT * FROM report_notes 
+        WHERE user_id = ? AND report_id = ? 
+        ORDER BY created_at DESC
+    ''', (user_id, report_id))
+    notes = [dict(row) for row in notes_cursor.fetchall()]
+    notes_conn.close()
+
     return render_template(
         'report_detail.html', 
         report=report_dict,
-        deepseek_analysis=deepseek_analysis
+        deepseek_analysis=deepseek_analysis,
+        notes=notes
     )
 
 # API端点 - 获取所有研报数据
@@ -1365,10 +1378,160 @@ def update_reading_duration(report_id):
     else:
         return jsonify({"success": False, "message": "Failed to update reading duration"}), 500
 
-if __name__ == '__main__':
-    # 初始化应用
-    init_app()
+@app.route('/api/report/<int:report_id>/notes', methods=['GET'])
+@login_required
+def get_notes(report_id):
+    """获取指定报告的笔记"""
+    user_id = session['user']['id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT * FROM report_notes WHERE user_id = ? AND report_id = ? ORDER BY created_at DESC',
+        (user_id, report_id)
+    )
+    notes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(notes)
+
+@app.route('/api/report/<int:report_id>/notes', methods=['POST'])
+@login_required
+def add_note(report_id):
+    """为指定报告添加新笔记"""
+    user_id = session['user']['id']
+    data = request.json
+    note_content = data.get('note_content')
+
+    if not note_content:
+        return jsonify({'success': False, 'message': '笔记内容不能为空'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO report_notes (user_id, report_id, note_content) VALUES (?, ?, ?)',
+        (user_id, report_id, note_content)
+    )
+    note_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'message': '笔记已保存', 'note_id': note_id}), 201
+
+@app.route('/api/notes/<int:note_id>', methods=['PUT'])
+@login_required
+def update_note(note_id):
+    """更新笔记"""
+    user_id = session['user']['id']
+    data = request.json
+    note_content = data.get('note_content')
+
+    if not note_content:
+        return jsonify({'success': False, 'message': '笔记内容不能为空'}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # 检查笔记是否存在且属于当前用户
+    cursor.execute('SELECT id FROM report_notes WHERE id = ? AND user_id = ?', (note_id, user_id))
+    note = cursor.fetchone()
+
+    if not note:
+        conn.close()
+        return jsonify({'success': False, 'message': '未找到笔记或无权限'}), 404
+
+    cursor.execute(
+        'UPDATE report_notes SET note_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        (note_content, note_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': '笔记已更新'})
+
+@app.route('/api/notes/<int:note_id>', methods=['DELETE'])
+@login_required
+def delete_note(note_id):
+    """删除笔记"""
+    user_id = session['user']['id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # 检查笔记是否存在且属于当前用户
+    cursor.execute('SELECT id FROM report_notes WHERE id = ? AND user_id = ?', (note_id, user_id))
+    note = cursor.fetchone()
+
+    if not note:
+        conn.close()
+        return jsonify({'success': False, 'message': '未找到笔记或无权限'}), 404
+
+    cursor.execute('DELETE FROM report_notes WHERE id = ?', (note_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': '笔记已删除'})
+
+def run_migrations():
+    """
+    动态扫描migrations目录，并按顺序运行所有的数据库迁移脚本。
+    这个函数确保数据库从一个空状态，能够被逐步构建到最新的结构。
+    """
+    print("="*50)
+    print("开始执行数据库迁移流程...")
     
+    migrations_dir = 'migrations'
+    
+    try:
+        # 1. 获取所有迁移文件并排序
+        migration_files = sorted([
+            f for f in os.listdir(migrations_dir) 
+            if f.endswith('.py') and f != '__init__.py'
+        ])
+
+        if not migration_files:
+            print("在 'migrations' 目录中未找到迁移文件。")
+            print("="*50)
+            return
+
+        # 2. 依次执行迁移
+        for i, filename in enumerate(migration_files):
+            module_name = filename[:-3]
+            file_path = os.path.join(migrations_dir, filename)
+            
+            print(f"\n[ {i+1}/{len(migration_files)} ] 准备执行迁移: {module_name}")
+
+            try:
+                # 动态加载模块
+                spec = importlib.util.spec_from_file_location(module_name, file_path)
+                migration_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(migration_module)
+                
+                # 获取并执行 migrate 函数
+                if hasattr(migration_module, 'migrate'):
+                    migration_func = getattr(migration_module, 'migrate')
+                    migration_func(app.config['DATABASE'])
+                else:
+                    print(f"!!! 警告: 在 {filename} 中未找到 'migrate' 函数，已跳过。")
+
+            except Exception as e:
+                import traceback
+                print(f"!!! 迁移 {module_name} 失败: {e}")
+                print(traceback.format_exc())
+                print("!!! 迁移流程中断。")
+                break
+        else:
+            print("\n所有数据库迁移任务成功完成。")
+
+    except FileNotFoundError:
+        print(f"错误：未找到 '{migrations_dir}' 目录。")
+    except Exception as e:
+        import traceback
+        print(f"执行迁移时发生未知错误: {e}")
+        print(traceback.format_exc())
+    
+    print("="*50)
+
+if __name__ == '__main__':
+    # 设置数据库路径
+    app.config['DATABASE'] = DATABASE_PATH
+    
+    # 初始化应用时运行迁移
+    run_migrations()
+
     # 查找可用端口
     port = find_available_port()
     print(f"启动Flask应用，使用端口: {port}")
