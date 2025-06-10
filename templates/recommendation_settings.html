@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">推荐设置</h2>
+
+<form method="post" action="{{ url_for('recommendation_settings') }}">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>推荐因素权重</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">调整以下权重来影响研报推荐的排序方式（总和应为100）</p>
+            
+            <div class="mb-3">
+                <label for="weight_score" class="form-label">五步法分析评分权重</label>
+                <input type="range" class="form-range" min="0" max="100" step="5" 
+                       id="weight_score" name="weight_score" 
+                       value="{{ settings.weight_score }}"
+                       oninput="updateWeights()">
+                <div class="d-flex justify-content-between">
+                    <span>0%</span>
+                    <span id="weight_score_value">{{ settings.weight_score }}%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="weight_time" class="form-label">时间新鲜度权重</label>
+                <input type="range" class="form-range" min="0" max="100" step="5" 
+                       id="weight_time" name="weight_time" 
+                       value="{{ settings.weight_time }}"
+                       oninput="updateWeights()">
+                <div class="d-flex justify-content-between">
+                    <span>0%</span>
+                    <span id="weight_time_value">{{ settings.weight_time }}%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="weight_industry" class="form-label">行业相关性权重</label>
+                <input type="range" class="form-range" min="0" max="100" step="5" 
+                       id="weight_industry" name="weight_industry" 
+                       value="{{ settings.weight_industry }}"
+                       oninput="updateWeights()">
+                <div class="d-flex justify-content-between">
+                    <span>0%</span>
+                    <span id="weight_industry_value">{{ settings.weight_industry }}%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+            
+            <div class="alert alert-info" id="weight_total_alert">
+                权重总和: <span id="weight_total">100</span>%
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>偏好行业</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">选择您感兴趣的行业，这些行业的研报将获得更高的推荐优先级</p>
+            
+            <div class="mb-3">
+                <select class="form-select" id="industry_selector" multiple>
+                    {% for industry in all_industries %}
+                    <option value="{{ industry }}" 
+                            {% if industry in settings.preferred_industries %}selected{% endif %}>
+                        {{ industry }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="preferred_industries" id="preferred_industries" 
+                       value="{{ ','.join(settings.preferred_industries) }}">
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+        <button type="submit" class="btn btn-primary">保存设置</button>
+    </div>
+</form>
+
+<script>
+    function updateWeights() {
+        // 获取各权重值
+        const scoreWeight = parseInt(document.getElementById('weight_score').value);
+        const timeWeight = parseInt(document.getElementById('weight_time').value);
+        const industryWeight = parseInt(document.getElementById('weight_industry').value);
+        
+        // 更新显示
+        document.getElementById('weight_score_value').textContent = scoreWeight + '%';
+        document.getElementById('weight_time_value').textContent = timeWeight + '%';
+        document.getElementById('weight_industry_value').textContent = industryWeight + '%';
+        
+        // 计算总和
+        const total = scoreWeight + timeWeight + industryWeight;
+        document.getElementById('weight_total').textContent = total;
+        
+        // 根据总和显示提示
+        const alertElement = document.getElementById('weight_total_alert');
+        if (total === 100) {
+            alertElement.className = 'alert alert-success';
+        } else {
+            alertElement.className = 'alert alert-danger';
+        }
+    }
+    
+    // 处理行业选择
+    document.getElementById('industry_selector').addEventListener('change', function() {
+        const selected = Array.from(this.selectedOptions).map(option => option.value);
+        document.getElementById('preferred_industries').value = selected.join(',');
+    });
+    
+    // 初始化
+    updateWeights();
+</script>
+{% endblock %} 

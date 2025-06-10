@@ -482,7 +482,7 @@ class DeepSeekAnalyzer:
                 "completeness_score": 0,
                 "steps_found": 0,
                 "evaluation": "解析分析结果时出错"
-            }
+            } 
 
     def generate_video_script(self, report_info, analysis_result):
         """

@@ -617,6 +617,52 @@ class AnalysisDatabase:
             return ""
         finally:
             conn.close()
+            
+    def get_all_video_scripts(self) -> List[Dict[str, Any]]:
+        """
+        获取所有视频脚本，按创建时间降序排序
+        
+        Returns:
+        --------
+        List[Dict[str, Any]]
+            包含视频脚本信息的字典列表，每个字典包含id、report_id、script_text、created_at等字段
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            # 获取视频脚本信息，并关联研报标题和机构
+            cursor.execute('''
+            SELECT s.id, s.report_id, s.script_text, s.created_at, 
+                   r.title, r.org, r.industry, r.rating
+            FROM report_video_scripts s
+            JOIN reports r ON s.report_id = r.id
+            ORDER BY s.created_at DESC
+            ''')
+            
+            results = cursor.fetchall()
+            scripts = []
+            
+            for row in results:
+                script = {
+                    'id': row[0],
+                    'report_id': row[1],
+                    'script_text': row[2],
+                    'created_at': row[3],
+                    'report_title': row[4],
+                    'report_org': row[5],
+                    'report_industry': row[6],
+                    'report_rating': row[7]
+                }
+                scripts.append(script)
+                
+            return scripts
+                
+        except Exception as e:
+            logger.error(f"获取所有视频脚本时出错: {str(e)}")
+            return []
+        finally:
+            conn.close()
 
 # 测试代码
 if __name__ == "__main__":

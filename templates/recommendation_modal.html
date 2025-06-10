@@ -1,0 +1,50 @@
+<!-- 推荐弹窗 -->
+{% if top_recommendation %}
+<div class="modal fade" id="recommendationModal" tabindex="-1" aria-labelledby="recommendationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="recommendationModalLabel">今日推荐研报</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="recommendation-card">
+          <h5 class="card-title">{{ top_recommendation.title }}</h5>
+          <p class="card-subtitle mb-2 text-muted">
+              {{ top_recommendation.industry }} | {{ top_recommendation.date }} | {{ top_recommendation.org }}
+          </p>
+          <div class="d-flex align-items-center mb-3">
+              <div class="me-2">五步法评分:</div>
+              <div class="progress flex-grow-1">
+                  <div class="progress-bar" role="progressbar" 
+                       style="width: {{ top_recommendation.completeness_score }}%;" 
+                       aria-valuenow="{{ top_recommendation.completeness_score }}" 
+                       aria-valuemin="0" aria-valuemax="100">
+                      {{ top_recommendation.completeness_score }}
+                  </div>
+              </div>
+          </div>
+          {% if top_recommendation.abstract %}
+          <p class="card-text">{{ top_recommendation.abstract|truncate(100) }}</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">稍后提醒</button>
+        <a href="{{ url_for('mark_not_interested', report_id=top_recommendation.id) }}" 
+           class="btn btn-outline-danger">不感兴趣</a>
+        <a href="{{ url_for('report_detail', report_id=top_recommendation.id) }}" 
+           class="btn btn-primary">立即阅读</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 页面加载后显示推荐弹窗
+  document.addEventListener('DOMContentLoaded', function() {
+    var recommendationModal = new bootstrap.Modal(document.getElementById('recommendationModal'));
+    recommendationModal.show();
+  });
+</script>
+{% endif %} 

@@ -573,4 +573,32 @@ h1, h2, h3, h4, h5, h6 {
 
 .card-header .btn-light:hover {
     background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 推荐卡片样式 */
+.recommendation-section {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+}
+
+.recommendation-card {
+    border-left: 4px solid #0d6efd;
+    transition: all 0.3s ease;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* 未读标记样式 */
+.unread-badge {
+    width: 10px;
+    height: 10px;
+    background-color: #0d6efd;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
 } 

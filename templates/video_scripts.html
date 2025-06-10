@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}视频脚本库 - 五步法研报检查器{% endblock %}
+
+{% block extra_head %}
+<style>
+    .script-card {
+        height: 100%;
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    
+    .script-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .script-content {
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        position: relative;
+    }
+    
+    .script-content::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 50px;
+        background: linear-gradient(transparent, white);
+        pointer-events: none;
+    }
+    
+    .masonry-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-gap: 20px;
+        grid-auto-flow: dense;
+    }
+    
+    .script-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .script-date {
+        font-size: 0.8rem;
+        color: #adb5bd;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 50px 0;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #dee2e6;
+        margin-bottom: 20px;
+    }
+    
+    .btn-floating {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        z-index: 100;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="fas fa-video me-2"></i>视频脚本库</h4>
+                <div>
+                    <a href="/" class="btn btn-sm btn-light">
+                        <i class="fas fa-home me-1"></i> 返回首页
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="lead">所有生成的投资顾问口播文案</p>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="input-group">
+                            <input type="text" id="scriptSearch" class="form-control" placeholder="搜索脚本...">
+                            <button class="btn btn-outline-secondary" type="button">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if scripts %}
+                <div class="masonry-grid">
+                    {% for script in scripts %}
+                    <div class="script-item">
+                        <div class="card script-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0 text-truncate" title="{{ script.report_title }}">
+                                    <a href="/report/{{ script.report_id }}" class="text-decoration-none">
+                                        {{ script.report_title|truncate(40) }}
+                                    </a>
+                                </h5>
+                                <span class="badge {% if script.report_rating == '买入' or script.report_rating == '强烈推荐' %}bg-success{% elif script.report_rating == '增持' %}bg-primary{% elif script.report_rating == '中性' %}bg-secondary{% else %}bg-light text-dark{% endif %}">
+                                    {{ script.report_rating }}
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="script-meta mb-2">
+                                    <span class="badge bg-light text-dark me-2">
+                                        <i class="fas fa-industry me-1"></i>{{ script.report_industry }}
+                                    </span>
+                                    <span class="badge bg-light text-dark">
+                                        <i class="fas fa-building me-1"></i>{{ script.report_org }}
+                                    </span>
+                                    <span class="script-date float-end">
+                                        <i class="fas fa-calendar-alt me-1"></i>{{ script.created_at }}
+                                    </span>
+                                </div>
+                                <div class="script-content">
+                                    {{ script.script_text|nl2br }}
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="btn-group w-100">
+                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-script-id="{{ script.id }}">
+                                        <i class="fas fa-copy me-1"></i>复制
+                                    </button>
+                                    <a href="/report/{{ script.report_id }}" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-file-alt me-1"></i>查看研报
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-secondary share-btn" data-script-id="{{ script.id }}">
+                                        <i class="fas fa-share-alt me-1"></i>分享
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-video-slash"></i>
+                    </div>
+                    <h4>暂无视频脚本</h4>
+                    <p class="text-muted">您还没有生成任何视频脚本，请从研报详情页生成。</p>
+                    <a href="/" class="btn btn-primary">
+                        <i class="fas fa-home me-1"></i>返回首页
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 悬浮按钮 -->
+<a href="/" class="btn btn-primary btn-floating">
+    <i class="fas fa-plus"></i>
+</a>
+
+<!-- 复制成功提示 -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 5">
+    <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">成功</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            脚本内容已复制到剪贴板！
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 复制按钮功能
+        document.querySelectorAll('.copy-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const scriptId = this.getAttribute('data-script-id');
+                const scriptContent = this.closest('.script-card').querySelector('.script-content').innerText;
+                
+                navigator.clipboard.writeText(scriptContent).then(function() {
+                    const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+                    toast.show();
+                });
+            });
+        });
+        
+        // 搜索功能
+        const searchInput = document.getElementById('scriptSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                document.querySelectorAll('.script-item').forEach(function(item) {
+                    const title = item.querySelector('.card-title').textContent.toLowerCase();
+                    const content = item.querySelector('.script-content').textContent.toLowerCase();
+                    const industry = item.querySelector('.script-meta').textContent.toLowerCase();
+                    
+                    if (title.includes(searchTerm) || content.includes(searchTerm) || industry.includes(searchTerm)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %} 

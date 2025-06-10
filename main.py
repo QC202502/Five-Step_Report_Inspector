@@ -12,6 +12,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 import sys
+from dotenv import load_dotenv
+
+# 加载.env文件中的环境变量
+load_dotenv()
+print(f"DEEPSEEK_API_KEY: {os.environ.get('DEEPSEEK_API_KEY', '未设置')[:8]}..." if os.environ.get('DEEPSEEK_API_KEY') else "DEEPSEEK_API_KEY未设置")
+
 try:
     from chromedriver_py import binary_path  # 导入chromedriver-py提供的二进制路径
     print(f"ChromeDriver binary path: {binary_path}")
@@ -854,7 +860,7 @@ def analyze_with_five_steps(summary, content="", industry=None):
                 "completeness_score": 0,
                 "steps_found": 0,
                 "evaluation": "分析器不可用，无法评估"
-            }
+    }
         }
 
 def get_evaluation_text(score):

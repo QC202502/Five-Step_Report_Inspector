@@ -13,6 +13,7 @@ import logging
 from database import get_db_connection, get_reports_from_db
 import threading
 from analysis_db import AnalysisDatabase
+from recommendation_engine import RecommendationEngine
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -80,12 +81,30 @@ def load_reports():
     # 从数据库获取研报列表
     return db.get_reports_from_db()
 
+# 初始化推荐引擎
+recommendation_engine = RecommendationEngine()
+
 # 首页路由 - 展示研报列表
 @app.route('/')
 def index():
-    """首页，展示研报列表"""
+    """首页"""
+    # 获取推荐研报
+    recommendations = recommendation_engine.get_recommendations(limit=5)
+    
+    # 为每个推荐研报添加已读状态
+    for report in recommendations:
+        report['is_read'] = recommendation_engine.check_is_read(report['id'])
+    
+    # 获取所有研报
     reports = load_reports_from_db()
-    return render_template('index.html', reports=reports)
+    
+    # 获取顶部推荐（用于弹窗）
+    top_recommendation = recommendations[0] if recommendations else None
+    
+    return render_template('index.html', 
+                          reports=reports, 
+                          recommendations=recommendations,
+                          top_recommendation=top_recommendation)
 
 # 研报详情页面
 @app.route('/report/<int:report_id>')
@@ -108,6 +127,9 @@ def report_detail(report_id):
     
     # 将行对象转换为字典
     report_dict = dict(report)
+    
+    # 检查研报是否已读
+    report_dict['is_read'] = recommendation_engine.check_is_read(report_id)
     
     # 获取分析结果
     analysis_db = AnalysisDatabase()
@@ -759,6 +781,59 @@ def get_all_video_scripts():
     except Exception as e:
         logger.error(f"获取所有视频脚本时出错: {str(e)}")
         return jsonify({"success": False, "message": str(e)})
+
+@app.route('/mark_read/<int:report_id>')
+def mark_read(report_id):
+    """标记研报为已读"""
+    success = recommendation_engine.mark_as_read(report_id)
+    if success:
+        flash('已标记为已读', 'success')
+    else:
+        flash('标记失败', 'error')
+    return redirect(url_for('report_detail', report_id=report_id))
+
+@app.route('/mark_not_interested/<int:report_id>')
+def mark_not_interested(report_id):
+    """标记为不感兴趣"""
+    success = recommendation_engine.mark_as_read(report_id, status='not_interested')
+    if success:
+        flash('已标记为不感兴趣', 'success')
+    else:
+        flash('标记失败', 'error')
+    return redirect(url_for('index'))
+
+@app.route('/recommendation_settings', methods=['GET', 'POST'])
+def recommendation_settings():
+    """推荐设置页面"""
+    if request.method == 'POST':
+        # 更新推荐设置
+        settings = {
+            'weight_score': int(request.form.get('weight_score', 40)),
+            'weight_time': int(request.form.get('weight_time', 30)),
+            'weight_industry': int(request.form.get('weight_industry', 30)),
+            'preferred_industries': request.form.get('preferred_industries', '').split(',')
+        }
+        
+        success = recommendation_engine.update_user_preferences(**settings)
+        
+        if success:
+            flash('推荐设置已更新', 'success')
+        else:
+            flash('更新设置失败', 'error')
+            
+    # 获取当前设置
+    current_settings = recommendation_engine.get_user_settings()
+    
+    # 获取所有可用行业
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != ""')
+    all_industries = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    return render_template('recommendation_settings.html', 
+                          settings=current_settings,
+                          all_industries=all_industries)
 
 if __name__ == '__main__':
     # 初始化应用

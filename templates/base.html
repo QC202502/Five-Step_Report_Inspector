@@ -157,6 +157,16 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/video_scripts' %}active{% endif %}" href="/video_scripts">
+                            <i class="fas fa-video me-1"></i>视频脚本
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/recommendation_settings' %}active{% endif %}" href="/recommendation_settings">
+                            <i class="fas fa-star me-1"></i>推荐设置
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="#" id="scrapeNewBtn">
                             <i class="fas fa-sync-alt me-1"></i>实时爬取
                         </a>
