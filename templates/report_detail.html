@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 显示加载状态
             videoScriptContent.textContent = "正在加载文案内容...";
             videoScriptModal.show();
-                
+            
             // 从API获取视频文案
             fetch(`/get_video_script/{{ report.id }}`)
                 .then(response => response.json())
@@ -748,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <i class="fas fa-exclamation-circle me-2"></i> 
                             尚未生成视频文案，请点击"生成视频文案"按钮。
                         </div>`;
-                }
+                    }
                 })
                 .catch(error => {
                     videoScriptContent.innerHTML = `<div class="alert alert-danger">
@@ -757,7 +757,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>`;
                 });
         });
-            
+        
         // 复制文案按钮
         const copyScriptBtn = document.getElementById('copyScriptBtn');
         if (copyScriptBtn) {
