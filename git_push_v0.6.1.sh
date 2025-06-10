@@ -20,6 +20,6 @@ git commit -m "v$VERSION: 添加研报推荐功能，实现已读/未读状态�
 
 # 推送到远程仓库
 echo "推送到远程仓库..."
-git push origin master
+git push origin main
 
 echo "完成! v$VERSION 已成功提交和推送。" 
