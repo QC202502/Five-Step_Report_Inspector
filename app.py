@@ -993,42 +993,14 @@ def mark_not_interested(report_id):
         flash('标记失败', 'error')
     return redirect(url_for('index'))
 
-@app.route('/recommendation_settings', methods=['GET', 'POST'])
+@app.route('/recommendation_settings')
 @login_required
 def recommendation_settings():
-    """推荐设置页面"""
-    user_id = session['user']['id']
-    
-    if request.method == 'POST':
-        # 更新推荐设置
-        settings = {
-            'user_id': user_id,
-            'weight_score': int(request.form.get('weight_score', 40)),
-            'weight_time': int(request.form.get('weight_time', 30)),
-            'weight_industry': int(request.form.get('weight_industry', 30)),
-            'preferred_industries': request.form.get('preferred_industries', '').split(',')
-        }
-        
-        success = recommendation_engine.update_user_preferences(**settings)
-        
-        if success:
-            flash('推荐设置已更新', 'success')
-        else:
-            flash('更新设置失败', 'error')
-            
-    # 获取当前设置
-    current_settings = recommendation_engine.get_user_settings(user_id=user_id)
-    
-    # 获取所有可用行业
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != ""')
-    all_industries = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    
-    return render_template('recommendation_settings.html', 
-                          settings=current_settings,
-                          all_industries=all_industries)
+    """
+    旧的推荐设置页面，现在重定向到新的用户偏好设置页面。
+    """
+    flash('推荐设置已移动到新的 "用户偏好设置" 页面。', 'info')
+    return redirect(url_for('user_preferences', tab='recommendation'))
 
 @app.route('/user/preferences', methods=['GET', 'POST'])
 @login_required
@@ -1045,7 +1017,9 @@ def user_preferences():
                 'weight_score': int(request.form.get('weight_score', 40)),
                 'weight_time': int(request.form.get('weight_time', 30)),
                 'weight_industry': int(request.form.get('weight_industry', 30)),
-                'preferred_industries': request.form.get('preferred_industries', '').split(',') if request.form.get('preferred_industries') else [],
+                'focused_industries': request.form.getlist('focused_industries'),
+                'preferred_report_types': request.form.getlist('preferred_report_types'),
+                'followed_organizations': request.form.getlist('followed_organizations'),
                 'show_recommendations': request.form.get('show_recommendations') == 'on',
                 'show_recommendation_modal': request.form.get('show_recommendation_modal') == 'on',
                 'auto_mark_read': request.form.get('auto_mark_read') == 'on'
@@ -1114,11 +1088,13 @@ def user_preferences():
         'auto_mark_read': settings.get('auto_mark_read', True)
     }
     
-    # 获取所有可用行业
+    # 获取所有可用行业和机构
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != ""')
+    cursor.execute('SELECT DISTINCT industry FROM reports WHERE industry IS NOT NULL AND industry != "" ORDER BY industry')
     all_industries = [row[0] for row in cursor.fetchall()]
+    cursor.execute('SELECT DISTINCT org FROM reports WHERE org IS NOT NULL AND org != "" ORDER BY org')
+    all_organizations = [row[0] for row in cursor.fetchall()]
     conn.close()
     
     return render_template('preferences.html', 
@@ -1127,7 +1103,8 @@ def user_preferences():
                           privacy_settings=privacy_settings,
                           notification_settings=notification_settings,
                           user_preferences=user_preferences,
-                          all_industries=all_industries)
+                          all_industries=all_industries,
+                          all_organizations=all_organizations)
 
 @app.route('/user/reading_history')
 @login_required
@@ -1223,6 +1200,17 @@ def export_user_data():
         mimetype='application/json',
         headers={'Content-Disposition': f'attachment; filename={filename}'}
     )
+
+@app.route('/my_data')
+@login_required
+def my_data():
+    """显示用户的个人阅读数据报告页面"""
+    user_id = session['user']['id']
+    
+    # 获取阅读习惯统计数据
+    stats = preference_manager.get_reading_habit_stats(user_id)
+    
+    return render_template('my_data.html', stats=stats)
 
 @app.route('/user/export_reading_history')
 @login_required

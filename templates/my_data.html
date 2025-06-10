@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}我的数据 - 五步法研报分析器{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .stat-card {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: .5rem;
+        padding: 1.5rem;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .stat-card .stat-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #0d6efd;
+    }
+    .stat-card .stat-label {
+        font-size: 1rem;
+        color: #6c757d;
+    }
+    .chart-container {
+        position: relative;
+        height: 400px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="fas fa-chart-pie me-2"></i>我的阅读数据报告</h2>
+    </div>
+
+    <!-- Key Stats -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.total_reports_read }}</div>
+                <div class="stat-label">阅读报告总数</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-value">{{ (stats.total_reading_duration / 60) | round(1) }}</div>
+                <div class="stat-label">总阅读时长 (分钟)</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-value">{{ (stats.average_completion_rate * 100) | round(1) }}%</div>
+                <div class="stat-label">平均阅读完成度</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row mt-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">行业阅读分布</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="industryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">机构阅读分布</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="organizationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const chartColors = [
+        '#0d6efd', '#6f42c1', '#d63384', '#fd7e14', '#198754',
+        '#20c997', '#0dcaf0', '#ffc107', '#dc3545', '#6c757d'
+    ];
+
+    // 行业分布饼图
+    const industryCtx = document.getElementById('industryChart');
+    if (industryCtx) {
+        const industryData = {{ stats.top_industries | tojson }};
+        new Chart(industryCtx, {
+            type: 'pie',
+            data: {
+                labels: industryData.map(d => d.industry),
+                datasets: [{
+                    label: '阅读数量',
+                    data: industryData.map(d => d.count),
+                    backgroundColor: chartColors,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+    }
+
+    // 机构分布饼图
+    const orgCtx = document.getElementById('organizationChart');
+    if (orgCtx) {
+        const orgData = {{ stats.top_organizations | tojson }};
+        new Chart(orgCtx, {
+            type: 'pie',
+            data: {
+                labels: orgData.map(d => d.organization),
+                datasets: [{
+                    label: '阅读数量',
+                    data: orgData.map(d => d.count),
+                    backgroundColor: chartColors,
+                    hoverOffset: 4
+                }]
+            },
+             options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 

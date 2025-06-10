@@ -2,6 +2,11 @@
 
 {% block title %}用户偏好设置 - 五步法研报分析器{% endblock %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
     <h2 class="mb-4">用户偏好设置</h2>
@@ -22,11 +27,11 @@
                         <label for="weight_score" class="form-label">五步法分析评分权重</label>
                         <input type="range" class="form-range" min="0" max="100" step="5" 
                                id="weight_score" name="weight_score" 
-                               value="{{ settings.weight_score }}"
+                               value="{{ settings.get('weight_score', 40) }}"
                                oninput="updateWeights()">
                         <div class="d-flex justify-content-between">
                             <span>0%</span>
-                            <span id="weight_score_value">{{ settings.weight_score }}%</span>
+                            <span id="weight_score_value">{{ settings.get('weight_score', 40) }}%</span>
                             <span>100%</span>
                         </div>
                     </div>
@@ -35,11 +40,11 @@
                         <label for="weight_time" class="form-label">时间新鲜度权重</label>
                         <input type="range" class="form-range" min="0" max="100" step="5" 
                                id="weight_time" name="weight_time" 
-                               value="{{ settings.weight_time }}"
+                               value="{{ settings.get('weight_time', 30) }}"
                                oninput="updateWeights()">
                         <div class="d-flex justify-content-between">
                             <span>0%</span>
-                            <span id="weight_time_value">{{ settings.weight_time }}%</span>
+                            <span id="weight_time_value">{{ settings.get('weight_time', 30) }}%</span>
                             <span>100%</span>
                         </div>
                     </div>
@@ -48,11 +53,11 @@
                         <label for="weight_industry" class="form-label">行业相关性权重</label>
                         <input type="range" class="form-range" min="0" max="100" step="5" 
                                id="weight_industry" name="weight_industry" 
-                               value="{{ settings.weight_industry }}"
+                               value="{{ settings.get('weight_industry', 30) }}"
                                oninput="updateWeights()">
                         <div class="d-flex justify-content-between">
                             <span>0%</span>
-                            <span id="weight_industry_value">{{ settings.weight_industry }}%</span>
+                            <span id="weight_industry_value">{{ settings.get('weight_industry', 30) }}%</span>
                             <span>100%</span>
                         </div>
                     </div>
@@ -63,33 +68,55 @@
                 </div>
                 
                 <div class="mb-4">
-                    <h6 class="fw-bold">偏好行业</h6>
-                    <p class="text-muted">选择您感兴趣的行业，这些行业的研报将获得更高的推荐优先级</p>
-                    
-                    <div class="mb-3">
-                        <select class="form-select" id="industry_selector" multiple>
-                            {% for industry in all_industries %}
-                            <option value="{{ industry }}" 
-                                    {% if industry in settings.preferred_industries %}selected{% endif %}>
-                                {{ industry }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <input type="hidden" name="preferred_industries" id="preferred_industries" 
-                               value="{{ ','.join(settings.preferred_industries) }}">
-                    </div>
+                    <h6 class="fw-bold">专注行业</h6>
+                    <p class="text-muted">选择您重点关注的3-5个行业。这些行业的报告将获得最高优先级。</p>
+                    <select id="focused_industries_selector" name="focused_industries" multiple
+                            placeholder="请选择专注的行业..." autocomplete="off">
+                        {% for industry in all_industries %}
+                        <option value="{{ industry }}" {% if industry in settings.get('focused_industries', []) %}selected{% endif %}>
+                            {{ industry }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">偏好报告类型</h6>
+                    <p class="text-muted">选择您感兴趣的报告类型。</p>
+                    {% set report_types = ['行业深度', '公司研究', '宏观研究', '策略研究', '事件点评'] %}
+                    <select id="preferred_report_types_selector" name="preferred_report_types" multiple
+                            placeholder="请选择报告类型..." autocomplete="off">
+                        {% for type in report_types %}
+                        <option value="{{ type }}" {% if type in settings.get('preferred_report_types', []) %}selected{% endif %}>
+                            {{ type }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="fw-bold">关注的研究机构</h6>
+                    <p class="text-muted">选择您关注的研究机构。</p>
+                    <select id="followed_organizations_selector" name="followed_organizations" multiple
+                            placeholder="请选择研究机构..." autocomplete="off">
+                        {% for org in all_organizations %}
+                        <option value="{{ org }}" {% if org in settings.get('followed_organizations', []) %}selected{% endif %}>
+                            {{ org }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
                 
                 <div class="mb-4">
                     <h6 class="fw-bold">推荐内容设置</h6>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="show_recommendations" name="show_recommendations" 
-                               {% if user_preferences.show_recommendations %}checked{% endif %}>
+                               {% if user_preferences.get('show_recommendations', True) %}checked{% endif %}>
                         <label class="form-check-label" for="show_recommendations">在首页显示推荐研报</label>
                     </div>
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="show_recommendation_modal" name="show_recommendation_modal"
-                               {% if user_preferences.show_recommendation_modal %}checked{% endif %}>
+                               {% if user_preferences.get('show_recommendation_modal', True) %}checked{% endif %}>
                         <label class="form-check-label" for="show_recommendation_modal">登录时显示推荐弹窗</label>
                     </div>
                 </div>
@@ -136,40 +163,46 @@
 </div>
 
 <script>
-    // 推荐设置相关脚本
+    // 这个函数需要放在 `DOMContentLoaded` 之外，或者通过 window.updateWeights 暴露，以便内联的 oninput 事件可以调用它。
+    // 放在外面更简单。
     function updateWeights() {
-        // 获取各权重值
-        const scoreWeight = parseInt(document.getElementById('weight_score').value);
-        const timeWeight = parseInt(document.getElementById('weight_time').value);
-        const industryWeight = parseInt(document.getElementById('weight_industry').value);
+        const scoreWeight = parseInt(document.getElementById('weight_score').value) || 0;
+        const timeWeight = parseInt(document.getElementById('weight_time').value) || 0;
+        const industryWeight = parseInt(document.getElementById('weight_industry').value) || 0;
         
-        // 更新显示
         document.getElementById('weight_score_value').textContent = scoreWeight + '%';
         document.getElementById('weight_time_value').textContent = timeWeight + '%';
         document.getElementById('weight_industry_value').textContent = industryWeight + '%';
         
-        // 计算总和
         const total = scoreWeight + timeWeight + industryWeight;
-        document.getElementById('weight_total').textContent = total;
-        
-        // 根据总和显示提示
+        const totalElement = document.getElementById('weight_total');
         const alertElement = document.getElementById('weight_total_alert');
+        
+        totalElement.textContent = total;
         if (total === 100) {
             alertElement.className = 'alert alert-success';
         } else {
-            alertElement.className = 'alert alert-danger';
+            alertElement.className = 'alert alert-warning';
         }
     }
-    
-    // 处理行业选择
-    document.getElementById('industry_selector').addEventListener('change', function() {
-        const selected = Array.from(this.selectedOptions).map(option => option.value);
-        document.getElementById('preferred_industries').value = selected.join(',');
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化 TomSelect
+    new TomSelect('#focused_industries_selector', {
+        plugins: ['remove_button'],
+        maxItems: 5,
+        create: true,
+    });
+    new TomSelect('#preferred_report_types_selector', {
+        plugins: ['remove_button'],
+    });
+    new TomSelect('#followed_organizations_selector', {
+        plugins: ['remove_button'],
+        create: true,
     });
     
-    // 初始化
-    document.addEventListener('DOMContentLoaded', function() {
-        updateWeights();
-    });
+    // 页面加载时，立即调用一次来设置初始状态
+    updateWeights();
+});
 </script>
 {% endblock %} 

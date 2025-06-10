@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta
 import json
 import math
+from preference_manager import PreferenceManager # 引入新的偏好管理器
 
 class RecommendationEngine:
     """研报推荐引擎"""
@@ -12,36 +13,7 @@ class RecommendationEngine:
     def __init__(self, db_path='research_reports.db'):
         """初始化推荐引擎"""
         self.db_path = db_path
-    
-    def get_user_settings(self, user_id=1):
-        """获取用户的推荐设置"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-        SELECT weight_score, weight_time, weight_industry, preferred_industries
-        FROM recommendation_settings
-        WHERE user_id = ?
-        ''', (user_id,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            return {
-                'weight_score': result[0],
-                'weight_time': result[1],
-                'weight_industry': result[2],
-                'preferred_industries': result[3].split(',') if result[3] else []
-            }
-        else:
-            # 返回默认设置
-            return {
-                'weight_score': 40,
-                'weight_time': 30,
-                'weight_industry': 30,
-                'preferred_industries': []
-            }
+        self.preference_manager = PreferenceManager(db_path) # 实例化偏好管理器
     
     def calculate_time_score(self, date_str):
         """计算时间新鲜度分数，越新的研报分数越高"""
@@ -91,156 +63,95 @@ class RecommendationEngine:
                 return 75
         
         return 30  # 不匹配偏好行业
-    
+
+    def _calculate_preference_score(self, report, preferences):
+        """计算基于用户偏好的额外分数"""
+        score = 0
+        
+        # 1. 专注行业匹配
+        if report.get('industry') and preferences.get('focused_industries'):
+            if report['industry'] in preferences['focused_industries']:
+                score += 50  # 命中专注行业，给予高加分
+
+        # 2. 关注机构匹配
+        if report.get('org') and preferences.get('followed_organizations'):
+            if report['org'] in preferences['followed_organizations']:
+                score += 30 # 命中关注机构，给予中等加分
+        
+        # 3. 报告类型匹配 (未来可扩展)
+        # report_type = self._infer_report_type(report.get('title'))
+        # if report_type and preferences.get('preferred_report_types'):
+        #     if report_type in preferences['preferred_report_types']:
+        #         score += 20
+                
+        return score
+
     def get_recommendations(self, user_id=1, limit=5):
-        """获取推荐研报列表，考虑用户阅读历史"""
+        """获取推荐研报列表，考虑用户偏好和阅读历史"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 检查表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='recommendation_settings'")
-        if not cursor.fetchone():
-            # 如果表不存在，返回空列表
-            conn.close()
-            print("警告: recommendation_settings表不存在，请先运行数据库迁移脚本")
-            return []
+        # 1. 获取用户的所有推荐偏好设置
+        try:
+            settings = self.preference_manager.get_user_preferences(user_id, 'recommendation')
+        except Exception as e:
+            print(f"获取用户偏好失败: {e}, 将使用默认设置。")
+            settings = self.preference_manager._get_default_preferences('recommendation')
+
+        # 2. 获取该用户已读的报告ID列表
+        read_report_ids = set()
+        try:
+            history = self.preference_manager.get_reading_history(user_id, limit=500) # 获取最近500条
+            read_report_ids = {item['report_id'] for item in history}
+        except Exception as e:
+            print(f"获取阅读历史失败: {e}")
+
+        # 3. 从数据库获取所有报告（或近期报告）
+        # 为了性能，可以只取最近几个月的报告进行推荐
+        two_months_ago = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')
+        cursor.execute('''
+        SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, a.completeness_score
+        FROM reports r
+        LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
+        WHERE r.date >= ? 
+        ''', (two_months_ago,))
+        
+        all_reports = cursor.fetchall()
+        conn.close()
+
+        # 4. 计算每个报告的分数
+        scored_reports = []
+        for report_row in all_reports:
+            report = dict(report_row)
             
-        # 获取用户设置
-        settings = self.get_user_settings(user_id)
-        
-        # 检查用户偏好设置表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_preferences'")
-        user_preferences_exists = cursor.fetchone() is not None
-        
-        # 检查阅读历史表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reading_history'")
-        reading_history_exists = cursor.fetchone() is not None
-        
-        # 检查旧的read_records表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='read_records'")
-        read_records_exists = cursor.fetchone() is not None
-        
-        # 获取用户阅读历史中的行业偏好
-        industry_preferences = settings['preferred_industries']
-        
-        # 如果存在阅读历史表，分析用户的阅读偏好
-        if reading_history_exists:
-            # 获取用户最近阅读的行业分布
-            cursor.execute('''
-            SELECT r.industry, COUNT(*) as count
-            FROM reading_history h
-            JOIN reports r ON h.report_id = r.id
-            WHERE h.user_id = ? AND r.industry IS NOT NULL AND r.industry != ''
-            GROUP BY r.industry
-            ORDER BY count DESC
-            LIMIT 5
-            ''', (user_id,))
-            
-            read_industries = cursor.fetchall()
-            
-            # 将用户经常阅读的行业添加到偏好中
-            for row in read_industries:
-                industry = row['industry']
-                if industry and industry not in industry_preferences:
-                    industry_preferences.append(industry)
-        
-        # 构建SQL查询
-        # 优先获取未读研报
-        if reading_history_exists:
-            query = '''
-            SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
-                   r.content_preview, a.completeness_score
-            FROM reports r
-            LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
-            LEFT JOIN reading_history h ON r.id = h.report_id AND h.user_id = ?
-            WHERE h.id IS NULL  -- 未读研报
-            '''
-            params = (user_id,)
-        elif read_records_exists:
-            # 兼容旧版的read_records表
-            query = '''
-            SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
-                   r.content_preview, a.completeness_score
-            FROM reports r
-            LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
-            LEFT JOIN read_records rr ON r.id = rr.report_id AND rr.user_id = ?
-            WHERE rr.id IS NULL  -- 未读研报
-            '''
-            params = (user_id,)
-        else:
-            # 如果没有阅读历史表，获取所有研报
-            query = '''
-            SELECT r.id, r.title, r.industry, r.date, r.org, r.rating, r.abstract, 
-                   r.content_preview, a.completeness_score
-            FROM reports r
-            LEFT JOIN report_analysis a ON r.id = a.report_id AND a.analyzer_type = 'deepseek'
-            '''
-            params = ()
-            print("警告: 阅读历史表不存在，将显示所有研报")
-        
-        cursor.execute(query, params)
-        
-        reports = []
-        for row in cursor.fetchall():
-            report = dict(row)
-            
-            # 计算五步法评分分数 (0-100)
-            analysis_score = report['completeness_score'] if report['completeness_score'] else 50
-            
-            # 计算时间新鲜度分数 (0-100)
+            # 如果报告已读，则跳过
+            if report['id'] in read_report_ids:
+                continue
+
+            # 计算基础分数
+            analysis_score = report['completeness_score'] if report['completeness_score'] is not None else 50
             time_score = self.calculate_time_score(report['date'])
             
-            # 计算行业匹配分数 (0-100)
-            industry_score = self.calculate_industry_score(
-                report['industry'], 
-                industry_preferences
+            # 使用权重计算基础分
+            base_score = (
+                (analysis_score * settings.get('weight_score', 40) / 100) +
+                (time_score * settings.get('weight_time', 30) / 100)
             )
             
-            # 计算阅读历史相关性分数
-            history_score = 50  # 默认中等分数
+            # 计算偏好分数
+            preference_score = self._calculate_preference_score(report, settings)
             
-            # 如果存在阅读历史，分析相关性
-            if reading_history_exists:
-                # 获取用户阅读过的相似研报数量
-                if report['industry']:
-                    cursor.execute('''
-                    SELECT COUNT(*) as count
-                    FROM reading_history h
-                    JOIN reports r ON h.report_id = r.id
-                    WHERE h.user_id = ? AND r.industry = ?
-                    ''', (user_id, report['industry']))
-                    
-                    similar_count = cursor.fetchone()['count']
-                    
-                    # 根据相似研报阅读量调整分数
-                    if similar_count > 10:
-                        history_score = 100  # 用户非常喜欢这个行业
-                    elif similar_count > 5:
-                        history_score = 85  # 用户比较喜欢这个行业
-                    elif similar_count > 2:
-                        history_score = 70  # 用户有一定兴趣
-                    elif similar_count > 0:
-                        history_score = 60  # 用户略有兴趣
+            # 总分 = 基础分 + 偏好分
+            total_score = base_score + preference_score
             
-            # 计算总推荐分数，加入历史相关性因素
-            recommendation_score = (
-                (analysis_score * settings['weight_score'] / 100) +
-                (time_score * settings['weight_time'] / 100) +
-                (industry_score * settings['weight_industry'] / 100) +
-                (history_score * 0.2)  # 历史相关性额外加权20%
-            )
-            
-            report['recommendation_score'] = round(recommendation_score, 2)
-            reports.append(report)
+            report['recommendation_score'] = round(total_score, 2)
+            scored_reports.append(report)
         
-        conn.close()
+        # 5. 按最终分数排序
+        scored_reports.sort(key=lambda x: x['recommendation_score'], reverse=True)
         
-        # 按推荐分数排序
-        reports.sort(key=lambda x: x['recommendation_score'], reverse=True)
-        
-        # 返回前N条推荐
-        return reports[:limit]
+        return scored_reports[:limit]
     
     def mark_as_read(self, report_id, user_id=1, status='read'):
         """标记研报为已读，同时更新阅读历史"""

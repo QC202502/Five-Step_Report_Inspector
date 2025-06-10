@@ -195,62 +195,61 @@ class PreferenceManager:
     
     def record_reading_history(self, user_id, report_id, duration=0, is_completed=True):
         """
-        记录用户阅读历史
-        
-        参数:
-            user_id (int): 用户ID
-            report_id (int): 研报ID
-            duration (int): 阅读时长（秒），默认为0秒
-            is_completed (bool): 是否完成阅读，默认为已完成
-            
-        返回:
-            bool: 成功标志
+        记录用户阅读历史，并计算阅读完成度
         """
-        # 首先检查用户的隐私设置是否允许收集阅读历史
         privacy_settings = self.get_user_preferences(user_id, 'privacy')
         if not privacy_settings.get('collect_reading_history', True):
-            return True  # 如果用户设置不允许收集，则直接返回成功
-        
+            return True
+
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         try:
+            # 获取报告总字数
+            cursor.execute("SELECT LENGTH(full_content) FROM reports WHERE id = ?", (report_id,))
+            content_length_row = cursor.fetchone()
+            content_length = content_length_row[0] if content_length_row and content_length_row[0] is not None else 0
+
+            # 计算阅读完成度
+            completion_rate = 0.0
+            if content_length > 0:
+                # 假设平均阅读速度为 5字/秒 (300字/分钟)
+                estimated_read_time = content_length / 5
+                if estimated_read_time > 0:
+                    completion_rate = min(1.0, duration / estimated_read_time) # 完成度最高为100%
+
             # 检查是否已有记录
             cursor.execute('''
             SELECT id, read_duration, is_completed FROM reading_history 
             WHERE user_id = ? AND report_id = ?
             ''', (user_id, report_id))
-            
             existing = cursor.fetchone()
             
             if existing:
-                # 更新现有记录 - 只使用当前会话的时长，不累加
+                # 更新现有记录
                 new_duration = duration
                 new_completed = 1 if is_completed else existing['is_completed']
-                
-                # 记录调试信息
-                print(f"更新阅读记录: 报告ID={report_id}, 用户ID={user_id}, 时长={duration}秒, 完成状态={is_completed}")
                 
                 cursor.execute('''
                 UPDATE reading_history 
                 SET read_at = CURRENT_TIMESTAMP, 
                     read_duration = ?, 
-                    is_completed = ?
+                    is_completed = ?,
+                    completion_rate = ?
                 WHERE id = ?
-                ''', (new_duration, new_completed, existing['id']))
+                ''', (new_duration, new_completed, completion_rate, existing['id']))
             else:
                 # 插入新记录
                 cursor.execute('''
-                INSERT INTO reading_history (user_id, report_id, read_duration, is_completed)
-                VALUES (?, ?, ?, ?)
-                ''', (user_id, report_id, duration, 1 if is_completed else 0))
+                INSERT INTO reading_history (user_id, report_id, read_duration, is_completed, completion_rate)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (user_id, report_id, duration, 1 if is_completed else 0, completion_rate))
             
             conn.commit()
             return True
-            
         except Exception as e:
+            print(f"记录阅读历史时出错: {e}")
             conn.rollback()
-            print(f"记录阅读历史失败: {str(e)}")
             return False
         finally:
             conn.close()
@@ -513,7 +512,7 @@ class PreferenceManager:
     
     def export_user_data(self, user_id):
         """
-        导出用户数据
+        导出用户的所有相关数据
         
         参数:
             user_id (int): 用户ID
@@ -549,7 +548,10 @@ class PreferenceManager:
                 'preferred_industries': [],
                 'show_recommendations': True,
                 'show_recommendation_modal': True,
-                'auto_mark_read': True
+                'auto_mark_read': True,
+                'focused_industries': [],
+                'preferred_report_types': [],
+                'followed_organizations': []
             }
         elif preference_type == 'reading':
             return {
@@ -583,4 +585,66 @@ class PreferenceManager:
             'new_reports': True,
             'industry_reports': True,
             'high_quality': True
-        } 
+        }
+
+    def get_reading_habit_stats(self, user_id):
+        """
+        获取用户的阅读习惯统计数据，用于生成报告。
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        stats = {
+            'top_industries': [],
+            'top_organizations': [],
+            'total_reports_read': 0,
+            'total_reading_duration': 0,
+            'average_completion_rate': 0.0
+        }
+
+        try:
+            # 1. 最常阅读的行业 (Top 5)
+            cursor.execute('''
+                SELECT r.industry, COUNT(h.id) as read_count
+                FROM reading_history h
+                JOIN reports r ON h.report_id = r.id
+                WHERE h.user_id = ? AND r.industry IS NOT NULL AND r.industry != ''
+                GROUP BY r.industry
+                ORDER BY read_count DESC
+                LIMIT 5
+            ''', (user_id,))
+            stats['top_industries'] = [{'industry': row[0], 'count': row[1]} for row in cursor.fetchall()]
+
+            # 2. 最常阅读的机构 (Top 5)
+            cursor.execute('''
+                SELECT r.org, COUNT(h.id) as read_count
+                FROM reading_history h
+                JOIN reports r ON h.report_id = r.id
+                WHERE h.user_id = ? AND r.org IS NOT NULL AND r.org != ''
+                GROUP BY r.org
+                ORDER BY read_count DESC
+                LIMIT 5
+            ''', (user_id,))
+            stats['top_organizations'] = [{'organization': row[0], 'count': row[1]} for row in cursor.fetchall()]
+
+            # 3, 4, 5. 总数、总时长、平均完成度
+            cursor.execute('''
+                SELECT 
+                    COUNT(id),
+                    SUM(read_duration),
+                    AVG(completion_rate)
+                FROM reading_history
+                WHERE user_id = ?
+            ''', (user_id,))
+            result = cursor.fetchone()
+            if result:
+                stats['total_reports_read'] = result[0] or 0
+                stats['total_reading_duration'] = result[1] or 0
+                stats['average_completion_rate'] = round(result[2] or 0.0, 2)
+
+        except Exception as e:
+            print(f"获取阅读习惯统计时出错: {e}")
+        finally:
+            conn.close()
+            
+        return stats 
