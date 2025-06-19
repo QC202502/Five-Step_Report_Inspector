@@ -1525,6 +1525,74 @@ def run_migrations():
     
     print("="*50)
 
+@app.route('/rating/<rating>')
+def filter_by_rating(rating):
+    """按评级筛选研报"""
+    conn = get_db_connection()
+    try:
+        reports = []
+        cursor = conn.cursor()
+        
+        # 获取符合评级的研报
+        rows = cursor.execute('''
+        SELECT id FROM reports 
+        WHERE rating = ?
+        ORDER BY date DESC
+        ''', (rating,)).fetchall()
+        
+        report_ids = [row['id'] for row in rows]
+        
+        # 使用现有函数加载研报详情
+        for report_id in report_ids:
+            report = get_report_by_id(report_id)
+            if report:
+                reports.append(report)
+        
+        return render_template('filtered_reports.html', 
+                              reports=reports, 
+                              filter_type="评级", 
+                              filter_value=rating)
+    except Exception as e:
+        app.logger.error(f"按评级筛选研报时出错: {e}")
+        flash(f"获取研报数据出错: {e}", "danger")
+        return redirect(url_for('index'))
+    finally:
+        conn.close()
+
+@app.route('/date/<date>')
+def filter_by_date(date):
+    """按发布日期筛选研报"""
+    conn = get_db_connection()
+    try:
+        reports = []
+        cursor = conn.cursor()
+        
+        # 获取符合日期的研报
+        rows = cursor.execute('''
+        SELECT id FROM reports 
+        WHERE date = ?
+        ORDER BY id DESC
+        ''', (date,)).fetchall()
+        
+        report_ids = [row['id'] for row in rows]
+        
+        # 使用现有函数加载研报详情
+        for report_id in report_ids:
+            report = get_report_by_id(report_id)
+            if report:
+                reports.append(report)
+        
+        return render_template('filtered_reports.html', 
+                              reports=reports, 
+                              filter_type="日期", 
+                              filter_value=date)
+    except Exception as e:
+        app.logger.error(f"按日期筛选研报时出错: {e}")
+        flash(f"获取研报数据出错: {e}", "danger")
+        return redirect(url_for('index'))
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     # 设置数据库路径
     app.config['DATABASE'] = DATABASE_PATH

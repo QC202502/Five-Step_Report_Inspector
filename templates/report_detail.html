@@ -242,59 +242,81 @@
         color: #6c757d;
     }
     
-    /* 研报信息概览卡片样式 */
-    .report-info-card {
-        border: 1px solid #dee2e6;
-        border-radius: 0.25rem;
-        margin-bottom: 1.5rem;
-        background-color: #f8f9fa;
-    }
-    
-    .report-info-header {
-        background-color: #f0f0f0;
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .report-info-body {
+    /* 研报信息标签页样式 */
+    .report-info-tabs {
         display: flex;
-        flex-wrap: wrap;
+        border-bottom: 1px solid #dee2e6;
+        margin-bottom: 1.5rem;
+        overflow-x: auto;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem 0.25rem 0 0;
     }
     
-    .report-info-item {
-        flex: 1 0 20%;
-        padding: 0.75rem 1rem;
-        border-right: 1px solid #dee2e6;
+    .report-info-tab {
+        flex: 1;
+        padding: 1rem;
         text-align: center;
+        border-right: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: #495057;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 120px;
     }
     
-    .report-info-item:last-child {
+    .report-info-tab:last-child {
         border-right: none;
     }
     
-    .info-label {
-        font-size: 0.85rem;
+    .report-info-tab:hover {
+        background-color: #e9ecef;
+    }
+    
+    .info-tab-label {
+        font-size: 0.8rem;
         color: #6c757d;
         margin-bottom: 0.25rem;
     }
     
-    .info-value {
+    .info-tab-value {
         font-weight: 500;
         font-size: 1rem;
     }
     
+    .report-info-tab .icon {
+        margin-right: 0.3rem;
+        font-size: 0.9rem;
+    }
+    
+    .report-title {
+        padding: 1rem;
+        background-color: #f0f0f0;
+        border-radius: 0.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid #dee2e6;
+    }
+    
     @media (max-width: 767.98px) {
-        .report-info-body {
-            flex-direction: column;
+        .report-info-tabs {
+            flex-wrap: nowrap;
+            overflow-x: auto;
         }
         
-        .report-info-item {
-            border-right: none;
-            border-bottom: 1px solid #dee2e6;
+        .report-info-tab {
+            padding: 0.7rem;
+            min-width: 100px;
         }
         
-        .report-info-item:last-child {
-            border-bottom: none;
+        .info-tab-label {
+            font-size: 0.7rem;
+        }
+        
+        .info-tab-value {
+            font-size: 0.9rem;
         }
     }
 </style>
@@ -309,36 +331,39 @@
             <li class="breadcrumb-item active" aria-current="page">研报详情</li>
         </ol>
     </nav>
-
-    <!-- 研报信息概览卡片 -->
-    <div class="report-info-card">
-        <div class="report-info-header">
-            <h4 class="mb-0">{{ report.title }}</h4>
-        </div>
-        <div class="report-info-body">
-            <div class="report-info-item">
-                <div class="info-label">机构</div>
-                <div class="info-value">{{ report.org }}</div>
-            </div>
-            <div class="report-info-item">
-                <div class="info-label">日期</div>
-                <div class="info-value">{{ report.date }}</div>
-            </div>
-            <div class="report-info-item">
-                <div class="info-label">评级</div>
-                <div class="info-value">{{ report.rating or '未评级' }}</div>
-            </div>
-            <div class="report-info-item">
-                <div class="info-label">股票</div>
-                <div class="info-value">{{ report.stock_name or '无' }}{% if report.stock_code %} ({{ report.stock_code }}){% endif %}</div>
-            </div>
-            <div class="report-info-item">
-                <div class="info-label">行业</div>
-                <div class="info-value">{{ report.industry or '未分类' }}</div>
-            </div>
-        </div>
+    
+    <!-- 研报标题 -->
+    <div class="report-title">
+        <h4 class="mb-0">{{ report.title }}</h4>
     </div>
 
+    <!-- 研报信息标签页式导航 -->
+    <div class="report-info-tabs">
+        <!-- 机构标签 -->
+        <a href="/organization/{{ report.org }}" class="report-info-tab">
+            <div class="info-tab-label"><i class="fas fa-university icon"></i>机构</div>
+            <div class="info-tab-value">{{ report.org }}</div>
+        </a>
+        
+        <!-- 行业标签 -->
+        <a href="/industry/{{ report.industry }}" class="report-info-tab">
+            <div class="info-tab-label"><i class="fas fa-industry icon"></i>行业</div>
+            <div class="info-tab-value">{{ report.industry }}</div>
+        </a>
+        
+        <!-- 评级标签 -->
+        <a href="/rating/{{ report.rating }}" class="report-info-tab">
+            <div class="info-tab-label"><i class="fas fa-star icon"></i>评级</div>
+            <div class="info-tab-value">{{ report.rating or '未评级' }}</div>
+        </a>
+        
+        <!-- 日期标签 -->
+        <a href="/date/{{ report.date }}" class="report-info-tab">
+            <div class="info-tab-label"><i class="fas fa-calendar-alt icon"></i>日期</div>
+            <div class="info-tab-value">{{ report.date }}</div>
+        </a>
+    </div>
+    
     <!-- 五维度分析卡片（顶部位置）-->
     {% if deepseek_analysis %}
     <div class="row mb-4">
