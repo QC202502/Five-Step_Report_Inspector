@@ -219,6 +219,33 @@ footer {
     .radar-chart-container {
         height: 200px;
     }
+
+    /* 移动端五维度卡片调整 */
+    .analysis-dimension-card {
+        margin-bottom: 1rem;
+    }
+    
+    .analysis-dimension-card .card-header {
+        padding: 0.6rem 0.8rem;
+    }
+    
+    .analysis-dimension-card .card-body {
+        padding: 0.8rem;
+    }
+    
+    .dimension-description {
+        font-size: 0.85rem;
+    }
+    
+    .framework-summary {
+        padding: 0.6rem;
+        font-size: 0.8rem;
+    }
+    
+    .score-badge {
+        font-size: 0.9rem;
+        padding: 0.2rem 0.4rem;
+    }
 }
 
 /* 五步法展示样式 */
@@ -601,4 +628,110 @@ h1, h2, h3, h4, h5, h6 {
     border-radius: 50%;
     display: inline-block;
     margin-right: 5px;
+}
+
+/* 五维度分析卡片样式 */
+.analysis-dimension-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-dimension-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.analysis-dimension-card .card-header {
+    padding: 0.8rem 1rem;
+    font-weight: bold;
+    border-bottom: none;
+}
+
+.analysis-dimension-card .card-body {
+    padding: 1rem;
+}
+
+.dimension-description {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.framework-summary {
+    background-color: rgba(0, 0, 0, 0.03);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.framework-summary h6 {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+/* 五维度卡片颜色方案 */
+.info-card .card-header {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-left: 4px solid #0d6efd;
+    color: #0d6efd;
+}
+
+.logic-card .card-header {
+    background-color: rgba(25, 135, 84, 0.1);
+    border-left: 4px solid #198754;
+    color: #198754;
+}
+
+.expectation-card .card-header {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    color: #664d03;
+}
+
+.catalyst-card .card-header {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid #dc3545;
+    color: #dc3545;
+}
+
+.conclusion-card .card-header {
+    background-color: rgba(111, 66, 193, 0.1);
+    border-left: 4px solid #6f42c1;
+    color: #6f42c1;
+}
+
+/* 五维度评分徽章样式 */
+.score-badge {
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
+}
+
+.info-card .score-badge {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.logic-card .score-badge {
+    background-color: #198754;
+    color: white;
+}
+
+.expectation-card .score-badge {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.catalyst-card .score-badge {
+    background-color: #dc3545;
+    color: white;
+}
+
+.conclusion-card .score-badge {
+    background-color: #6f42c1;
+    color: white;
 } 

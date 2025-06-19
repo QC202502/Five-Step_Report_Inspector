@@ -254,6 +254,131 @@
         </ol>
     </nav>
 
+    <!-- 五维度分析卡片（顶部位置）-->
+    {% if deepseek_analysis %}
+    <div class="row mb-4">
+        <!-- 信息维度卡片 -->
+        <div class="col-md-6 col-xl-2 col-lg-4 mb-3">
+            <div class="card h-100 analysis-dimension-card info-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <h5 class="mb-0">信息</h5>
+                        </div>
+                        <span class="badge score-badge">{{ deepseek_analysis.steps.信息.step_score }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="dimension-description">{{ deepseek_analysis.steps.信息.description | safe }}</p>
+                    {% if deepseek_analysis.steps.信息.framework_summary %}
+                    <div class="framework-summary mt-2">
+                        <h6>框架梳理</h6>
+                        <div class="small">{{ deepseek_analysis.steps.信息.framework_summary | safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 逻辑维度卡片 -->
+        <div class="col-md-6 col-xl-2 col-lg-4 mb-3">
+            <div class="card h-100 analysis-dimension-card logic-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-project-diagram me-2"></i>
+                            <h5 class="mb-0">逻辑</h5>
+                        </div>
+                        <span class="badge score-badge">{{ deepseek_analysis.steps.逻辑.step_score }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="dimension-description">{{ deepseek_analysis.steps.逻辑.description | safe }}</p>
+                    {% if deepseek_analysis.steps.逻辑.framework_summary %}
+                    <div class="framework-summary mt-2">
+                        <h6>框架梳理</h6>
+                        <div class="small">{{ deepseek_analysis.steps.逻辑.framework_summary | safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 超预期维度卡片 -->
+        <div class="col-md-6 col-xl-2 col-lg-4 mb-3">
+            <div class="card h-100 analysis-dimension-card expectation-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-chart-line me-2"></i>
+                            <h5 class="mb-0">超预期</h5>
+                        </div>
+                        <span class="badge score-badge">{{ deepseek_analysis.steps.超预期.step_score }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="dimension-description">{{ deepseek_analysis.steps.超预期.description | safe }}</p>
+                    {% if deepseek_analysis.steps.超预期.framework_summary %}
+                    <div class="framework-summary mt-2">
+                        <h6>框架梳理</h6>
+                        <div class="small">{{ deepseek_analysis.steps.超预期.framework_summary | safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 催化剂维度卡片 -->
+        <div class="col-md-6 col-xl-3 col-lg-6 mb-3">
+            <div class="card h-100 analysis-dimension-card catalyst-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-bolt me-2"></i>
+                            <h5 class="mb-0">催化剂</h5>
+                        </div>
+                        <span class="badge score-badge">{{ deepseek_analysis.steps.催化剂.step_score }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="dimension-description">{{ deepseek_analysis.steps.催化剂.description | safe }}</p>
+                    {% if deepseek_analysis.steps.催化剂.framework_summary %}
+                    <div class="framework-summary mt-2">
+                        <h6>框架梳理</h6>
+                        <div class="small">{{ deepseek_analysis.steps.催化剂.framework_summary | safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 结论维度卡片 -->
+        <div class="col-md-6 col-xl-3 col-lg-6 mb-3">
+            <div class="card h-100 analysis-dimension-card conclusion-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-flag-checkered me-2"></i>
+                            <h5 class="mb-0">结论</h5>
+                        </div>
+                        <span class="badge score-badge">{{ deepseek_analysis.steps.结论.step_score }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="dimension-description">{{ deepseek_analysis.steps.结论.description | safe }}</p>
+                    {% if deepseek_analysis.steps.结论.framework_summary %}
+                    <div class="framework-summary mt-2">
+                        <h6>框架梳理</h6>
+                        <div class="small">{{ deepseek_analysis.steps.结论.framework_summary | safe }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- 小屏幕上的侧边栏切换按钮 -->
     <div class="d-lg-none mb-3">
         <div class="d-flex justify-content-between">
@@ -372,6 +497,16 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if not deepseek_analysis %}
+            <div class="alert alert-info mb-4">
+                <h5><i class="fas fa-info-circle me-2"></i>尚未进行五步法分析</h5>
+                <p class="mb-2">该研报尚未进行五步法详细分析，请点击下方按钮进行分析。</p>
+                <a href="/analyze/{{ report.id }}" class="btn btn-success">
+                    <i class="fas fa-magic me-1"></i> 使用DeepSeek分析
+                </a>
+            </div>
+            {% endif %}
 
             <!-- 我的笔记 -->
             <div class="card mt-4" id="my-notes-section">
