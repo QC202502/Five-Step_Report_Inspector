@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>研报分析卡片</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f9fafb;
+        }
+        .share-card {
+            width: 800px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            margin: 2rem auto;
+            background: white;
+            position: relative;
+        }
+        .share-card-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 1.5rem;
+            position: relative;
+        }
+        .share-card-logo {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .share-card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .share-card-subtitle {
+            opacity: 0.8;
+            font-size: 0.95rem;
+        }
+        .share-card-body {
+            padding: 1.5rem;
+        }
+        .share-card-summary {
+            margin: 1rem 0;
+            padding: 1rem;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+        .steps-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 1rem 0.5rem;
+            border-radius: 8px;
+            background-color: #f9fafb;
+            transition: all 0.3s ease;
+        }
+        .step-info {
+            border-top: 4px solid var(--primary);
+        }
+        .step-logic {
+            border-top: 4px solid var(--success);
+        }
+        .step-beyond {
+            border-top: 4px solid var(--warning);
+        }
+        .step-catalyst {
+            border-top: 4px solid #6366f1;
+        }
+        .step-conclusion {
+            border-top: 4px solid var(--danger);
+        }
+        .step-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .step-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        .step-status {
+            font-size: 0.8rem;
+        }
+        .score-row {
+            display: flex;
+            align-items: center;
+            margin-top: 1.5rem;
+        }
+        .score-label {
+            font-weight: 500;
+            margin-right: 1rem;
+            min-width: 80px;
+        }
+        .score-bar {
+            flex-grow: 1;
+            height: 10px;
+            background-color: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+            position: relative;
+        }
+        .score-fill {
+            position: absolute;
+            height: 100%;
+            border-radius: 999px;
+        }
+        .score-excellent {
+            background-color: var(--success);
+        }
+        .score-good {
+            background-color: var(--primary);
+        }
+        .score-average {
+            background-color: var(--warning);
+        }
+        .score-poor {
+            background-color: var(--danger);
+        }
+        .score-value {
+            font-weight: 700;
+            margin-left: 1rem;
+            min-width: 40px;
+            text-align: right;
+        }
+        .share-card-footer {
+            padding: 1rem 1.5rem;
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.85rem;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-logo {
+            display: flex;
+            align-items: center;
+        }
+        .footer-logo img {
+            height: 24px;
+            margin-right: 0.5rem;
+        }
+        .qr-code {
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            border-radius: 4px;
+            padding: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="share-card">
+        <!-- 卡片头部 -->
+        <div class="share-card-header">
+            <div class="share-card-logo">
+                <img src="{{ url_for('static', filename='images/favicon.png', _external=True) }}" alt="Logo" height="30">
+            </div>
+            <h1 class="share-card-title">{{ report.title }}</h1>
+            <p class="share-card-subtitle">
+                {{ report.org }} | {{ report.industry }} | {{ report.date }}
+            </p>
+        </div>
+        
+        <!-- 卡片内容 -->
+        <div class="share-card-body">
+            <!-- 一句话总结 -->
+            {% if report.analysis.summary.one_line_summary %}
+            <div class="share-card-summary">
+                <i class="fas fa-quote-left me-2 text-primary"></i>
+                {{ report.analysis.summary.one_line_summary }}
+            </div>
+            {% endif %}
+            
+            <!-- 五步法应用情况 -->
+            <h5 class="mb-3">五步法分析结果</h5>
+            <div class="steps-container">
+                {% set steps = ['信息', '逻辑', '超预期', '催化剂', '结论'] %}
+                {% set step_icons = ['fas fa-info-circle', 'fas fa-link', 'fas fa-bolt', 'fas fa-rocket', 'fas fa-flag-checkered'] %}
+                {% set step_classes = ['step-info', 'step-logic', 'step-beyond', 'step-catalyst', 'step-conclusion'] %}
+                
+                {% for step in steps %}
+                    {% set step_found = report.analysis.steps[step].found if step in report.analysis.steps else false %}
+                    <div class="step-item {{ step_classes[loop.index0] }}">
+                        <div class="step-icon">
+                            <i class="{{ step_icons[loop.index0] }}"></i>
+                </div>
+                        <div class="step-title">{{ step }}</div>
+                        <div class="step-status">
+                            {% if step_found %}
+                                <span class="text-success">已覆盖</span>
+                            {% else %}
+                                <span class="text-danger">未覆盖</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <!-- 完整度得分 -->
+            <div class="score-row">
+                <div class="score-label">完整度评分</div>
+                <div class="score-bar">
+                    {% set score = report.analysis.summary.completeness_score %}
+                    {% if score >= 80 %}
+                        <div class="score-fill score-excellent" style="width: {{ score }}%;"></div>
+                    {% elif score >= 60 %}
+                        <div class="score-fill score-good" style="width: {{ score }}%;"></div>
+                    {% elif score >= 40 %}
+                        <div class="score-fill score-average" style="width: {{ score }}%;"></div>
+                    {% else %}
+                        <div class="score-fill score-poor" style="width: {{ score }}%;"></div>
+                    {% endif %}
+                </div>
+                <div class="score-value">{{ score }}分</div>
+            </div>
+            
+            <!-- 评估结果 -->
+            {% if report.analysis.summary.evaluation %}
+            <div class="mt-4">
+                <h6>评估结果：</h6>
+                <p>{{ report.analysis.summary.evaluation }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- 卡片底部 -->
+        <div class="share-card-footer">
+            <div class="footer-logo">
+                <img src="{{ url_for('static', filename='images/acorn_icon.png', _external=True) }}" alt="Logo">
+                <span>五步法研报检查器</span>
+            </div>
+            <div class="d-flex align-items-center">
+                <small class="me-2">扫码查看详情</small>
+                <div class="qr-code">
+                    <!-- 二维码图片将通过JS生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode.js/qrcode.min.js"></script>
+    <script>
+        // 生成二维码
+        document.addEventListener('DOMContentLoaded', function() {
+            const qrEl = document.querySelector('.qr-code');
+            const shareUrl = '{{ share_url }}';
+            
+            if (qrEl && shareUrl) {
+                // 清空现有内容
+                qrEl.innerHTML = '';
+                
+                // 生成二维码
+                new QRCode(qrEl, {
+                    text: shareUrl,
+                    width: 50,
+                    height: 50
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
