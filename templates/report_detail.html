@@ -241,6 +241,62 @@
         font-size: 1.5rem;
         color: #6c757d;
     }
+    
+    /* 研报信息概览卡片样式 */
+    .report-info-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        margin-bottom: 1.5rem;
+        background-color: #f8f9fa;
+    }
+    
+    .report-info-header {
+        background-color: #f0f0f0;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .report-info-body {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    
+    .report-info-item {
+        flex: 1 0 20%;
+        padding: 0.75rem 1rem;
+        border-right: 1px solid #dee2e6;
+        text-align: center;
+    }
+    
+    .report-info-item:last-child {
+        border-right: none;
+    }
+    
+    .info-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+    
+    .info-value {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+    
+    @media (max-width: 767.98px) {
+        .report-info-body {
+            flex-direction: column;
+        }
+        
+        .report-info-item {
+            border-right: none;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .report-info-item:last-child {
+            border-bottom: none;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -253,6 +309,35 @@
             <li class="breadcrumb-item active" aria-current="page">研报详情</li>
         </ol>
     </nav>
+
+    <!-- 研报信息概览卡片 -->
+    <div class="report-info-card">
+        <div class="report-info-header">
+            <h4 class="mb-0">{{ report.title }}</h4>
+        </div>
+        <div class="report-info-body">
+            <div class="report-info-item">
+                <div class="info-label">机构</div>
+                <div class="info-value">{{ report.org }}</div>
+            </div>
+            <div class="report-info-item">
+                <div class="info-label">日期</div>
+                <div class="info-value">{{ report.date }}</div>
+            </div>
+            <div class="report-info-item">
+                <div class="info-label">评级</div>
+                <div class="info-value">{{ report.rating or '未评级' }}</div>
+            </div>
+            <div class="report-info-item">
+                <div class="info-label">股票</div>
+                <div class="info-value">{{ report.stock_name or '无' }}{% if report.stock_code %} ({{ report.stock_code }}){% endif %}</div>
+            </div>
+            <div class="report-info-item">
+                <div class="info-label">行业</div>
+                <div class="info-value">{{ report.industry or '未分类' }}</div>
+            </div>
+        </div>
+    </div>
 
     <!-- 五维度分析卡片（顶部位置）-->
     {% if deepseek_analysis %}
